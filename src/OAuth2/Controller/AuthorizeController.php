@@ -194,18 +194,19 @@ class AuthorizeController implements AuthorizeControllerInterface
         $state = $request->query('state', $request->request('state'));
 
         // type and client_id are required
-        if (!$response_type || !in_array($response_type, $this->getValidResponseTypes())) {
+        if (!$response_type) {
             $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Invalid or missing response type', null);
 
             return false;
         }
 
-        if ($response_type == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
-            if (!isset($this->responseTypes['code'])) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'authorization code grant type not supported', null);
+        if (!array_key_exists($response_type, $this->responseTypes)) {
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'authorization code grant type not supported', null);
 
-                return false;
-            }
+            return false;
+        }
+
+        if ($response_type == 'code') {
             if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'authorization_code')) {
                 $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unauthorized_client', 'The grant type is unauthorized for this client_id', null);
 
@@ -310,6 +311,7 @@ class AuthorizeController implements AuthorizeControllerInterface
         ;
     }
 
+    // @todo remove in v2.0
     protected function getValidResponseTypes()
     {
         return array(

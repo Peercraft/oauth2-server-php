@@ -17,6 +17,7 @@ interface AuthorizationCodeInterface
      * @var string
      * @see http://tools.ietf.org/html/rfc6749#section-1.4.1
      * @see http://tools.ietf.org/html/rfc6749#section-4.2
+     * @todo remove in v2.0
      */
     const RESPONSE_TYPE_CODE = "code";
 
