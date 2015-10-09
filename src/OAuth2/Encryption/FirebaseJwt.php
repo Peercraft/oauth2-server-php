@@ -35,6 +35,21 @@ class FirebaseJwt implements EncryptionInterface
         }
     }
 
+    public function getSigningAlgorithms()
+    {
+        return array_keys(\JWT::$supported_algs);
+    }
+
+    public function getEncryptionAlgorithms_alg()
+    {
+        return array();
+    }
+
+    public function getEncryptionAlgorithms_enc()
+    {
+        return array();
+    }
+
     public function urlSafeB64Encode($data)
     {
         return \JWT::urlsafeB64Encode($data);
