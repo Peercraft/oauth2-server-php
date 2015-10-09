@@ -71,6 +71,9 @@ class Jwt implements EncryptionInterface
     {
         // use constants when possible, for HipHop support
         switch ($algo) {
+            case'none':
+                return empty($signature);
+
             case'HS256':
             case'HS384':
             case'HS512':
@@ -96,6 +99,9 @@ class Jwt implements EncryptionInterface
     private function sign($input, $key, $algo = 'HS256')
     {
         switch ($algo) {
+            case 'none':
+                return "";
+
             case 'HS256':
                 return hash_hmac('sha256', $input, $key, true);
 
@@ -130,7 +136,7 @@ class Jwt implements EncryptionInterface
 
     public function getSigningAlgorithms()
     {
-        return array('HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512');
+        return array('none', 'HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512');
     }
 
     public function getEncryptionAlgorithms_alg()
