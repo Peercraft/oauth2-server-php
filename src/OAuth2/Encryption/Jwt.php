@@ -128,6 +128,21 @@ class Jwt implements EncryptionInterface
         return $signature;
     }
 
+    public function getSigningAlgorithms()
+    {
+        return array('none', 'HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512');
+    }
+
+    public function getEncryptionAlgorithms_alg()
+    {
+        return array();
+    }
+
+    public function getEncryptionAlgorithms_enc()
+    {
+        return array();
+    }
+
     public function urlSafeB64Encode($data)
     {
         $b64 = base64_encode($data);
