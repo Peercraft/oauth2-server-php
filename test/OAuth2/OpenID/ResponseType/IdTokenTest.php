@@ -62,6 +62,7 @@ class IdTokenTest extends \PHPUnit_Framework_TestCase
         $this->assertNotNull($params);
         $this->assertArrayHasKey('id_token', $params);
         $this->assertArrayNotHasKey('access_token', $params);
+        $this->assertArrayNotHasKey('code', $params);
         $this->validateIdToken($params['id_token']);
     }
 
@@ -149,6 +150,8 @@ class IdTokenTest extends \PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('nonce', $claims);
         $this->assertArrayHasKey('email', $claims);
         $this->assertArrayHasKey('email_verified', $claims);
+        $this->assertArrayNotHasKey('c_hash', $claims);
+        $this->assertArrayNotHasKey('at_hash', $claims);
 
         $this->assertEquals($claims['iss'], 'test');
         $this->assertEquals($claims['aud'], 'Test Client ID');

@@ -9,16 +9,15 @@ use OAuth2\Storage\Bootstrap;
 use OAuth2\GrantType\ClientCredentials;
 use OAuth2\ResponseType\AccessToken;
 
-class IdTokenTokenTest extends \PHPUnit_Framework_TestCase
+class CodeIdTokenTokenTest extends \PHPUnit_Framework_TestCase
 {
-
     public function testHandleAuthorizeRequest()
     {
         // add the test parameters in memory
-        $server = $this->getTestServer(array('allow_implicit' => true));
+        $server = $this->getTestServer();
 
         $request = new Request(array(
-            'response_type' => 'id_token token',
+            'response_type' => 'code id_token token',
             'redirect_uri'  => 'http://adobe.com',
             'client_id'     => 'Test Client ID',
             'scope'         => 'openid',
@@ -39,9 +38,9 @@ class IdTokenTokenTest extends \PHPUnit_Framework_TestCase
         // assert fragment is in "application/x-www-form-urlencoded" format
         parse_str($parts['fragment'], $params);
         $this->assertNotNull($params);
-        $this->assertArrayHasKey('id_token', $params);
         $this->assertArrayHasKey('access_token', $params);
-        $this->assertArrayNotHasKey('code', $params);
+        $this->assertArrayHasKey('code', $params);
+        $this->assertArrayHasKey('id_token', $params);
 
         // validate ID Token
         $parts = explode('.', $params['id_token']);
@@ -61,9 +60,7 @@ class IdTokenTokenTest extends \PHPUnit_Framework_TestCase
         $this->assertArrayHasKey('auth_time', $claims);
         $this->assertArrayHasKey('nonce', $claims);
         $this->assertArrayHasKey('at_hash', $claims);
-
-        // only exists if an authorization code was granted along with the id_token
-        $this->assertArrayNotHasKey('c_hash', $claims);
+        $this->assertArrayHasKey('c_hash', $claims);
 
         $this->assertEquals($claims['iss'], 'test');
         $this->assertEquals($claims['aud'], 'Test Client ID');
@@ -78,13 +75,16 @@ class IdTokenTokenTest extends \PHPUnit_Framework_TestCase
             'use_openid_connect' => true,
             'issuer' => 'test',
             'id_lifetime' => 3600,
+            'allow_implicit' => true,
         );
 
         $memoryStorage = Bootstrap::getInstance()->getMemoryStorage();
         $responseTypes = array(
-            'token'     => $token   = new AccessToken($memoryStorage, $memoryStorage),
-            'id_token'  => $idToken = new IdToken($memoryStorage, $memoryStorage, $config),
-            'id_token token' => new IdTokenToken($token, $idToken),
+            'code'     => $code  = new AuthorizationCode($memoryStorage),
+            'token'    => $token = new AccessToken($memoryStorage, $memoryStorage),
+            'code token' => $codeToken = new CodeToken($code, $token),
+            'id_token'   => $idToken = new IdToken($memoryStorage, $memoryStorage, $config),
+            'code id_token token' => new CodeIdTokenToken($codeToken, $idToken),
         );
 
         $server = new Server($memoryStorage, $config, array(), $responseTypes);

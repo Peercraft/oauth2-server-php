@@ -39,7 +39,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         }
 
         // Generate an id token if needed.
-        if ($this->needsIdToken($this->getScope()) && $this->getResponseType() == self::RESPONSE_TYPE_AUTHORIZATION_CODE) {
+        if ($this->needsIdToken($this->getScope()) && $this->getResponseType() == 'code') {
             $params['id_token'] = $this->responseTypes['id_token']->createIdToken($this->getClientId(), $user_id, $this->nonce);
         }
 
@@ -58,7 +58,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         $nonce = $request->query('nonce');
 
         // Validate required nonce for "id_token" and "id_token token"
-        if (!$nonce && in_array($this->getResponseType(), array(self::RESPONSE_TYPE_ID_TOKEN, self::RESPONSE_TYPE_ID_TOKEN_TOKEN))) {
+        if (!$nonce && in_array($this->getResponseType(), array('id_token', 'id_token token'))) {
             $response->setError(400, 'invalid_nonce', 'This application requires you specify a nonce parameter');
 
             return false;
@@ -69,6 +69,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         return true;
     }
 
+    // @todo remove in v2.0
     protected function getValidResponseTypes()
     {
         return array(
@@ -77,6 +78,8 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             self::RESPONSE_TYPE_ID_TOKEN,
             self::RESPONSE_TYPE_ID_TOKEN_TOKEN,
             self::RESPONSE_TYPE_CODE_ID_TOKEN,
+            self::RESPONSE_TYPE_CODE_TOKEN,
+            self::RESPONSE_TYPE_CODE_ID_TOKEN_TOKEN,
         );
     }
 

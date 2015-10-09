@@ -31,7 +31,7 @@ class IdToken implements IdTokenInterface
         ), $config);
     }
 
-    public function getAuthorizeResponse($params, $userInfo = null)
+    public function getAuthorizeResponse($params, $userInfo = null, $access_token = null, $authorization_code = null)
     {
         // build the URL to redirect to
         $result = array('query' => array());
@@ -41,7 +41,7 @@ class IdToken implements IdTokenInterface
         list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
         $userClaims = $this->userClaimsStorage->getUserClaims($user_id, $params['scope']);
 
-        $id_token = $this->createIdToken($params['client_id'], $userInfo, $params['nonce'], $userClaims, null);
+        $id_token = $this->createIdToken($params['client_id'], $userInfo, $params['nonce'], $userClaims, $access_token, $authorization_code);
         $result["fragment"] = array('id_token' => $id_token);
         if (isset($params['state'])) {
             $result["fragment"]["state"] = $params['state'];
@@ -50,7 +50,7 @@ class IdToken implements IdTokenInterface
         return array($params['redirect_uri'], $result);
     }
 
-    public function createIdToken($client_id, $userInfo, $nonce = null, $userClaims = null, $access_token = null)
+    public function createIdToken($client_id, $userInfo, $nonce = null, $userClaims = null, $access_token = null, $authorization_code = null)
     {
         // pull auth_time from user info if supplied
         list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
@@ -76,6 +76,10 @@ class IdToken implements IdTokenInterface
             $token['at_hash'] = $this->createAtHash($access_token, $client_id);
         }
 
+        if ($authorization_code) {
+            $token['c_hash'] = $this->createAtHash($authorization_code, $client_id);
+        }
+
         return $this->encodeToken($token, $client_id);
     }
 
@@ -84,7 +88,7 @@ class IdToken implements IdTokenInterface
         // maps HS256 and RS256 to sha256, etc.
         $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id);
         $hash_algorithm = 'sha' . substr($algorithm, 2);
-        $hash = hash($hash_algorithm, $access_token);
+        $hash = hash($hash_algorithm, $access_token, true);
         $at_hash = substr($hash, 0, strlen($hash) / 2);
 
         return $this->encryptionUtil->urlSafeB64Encode($at_hash);
