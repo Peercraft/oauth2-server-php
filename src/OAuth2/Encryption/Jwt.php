@@ -96,6 +96,9 @@ class Jwt implements EncryptionInterface
     private function sign($input, $key, $algo = 'HS256')
     {
         switch ($algo) {
+            case 'none':
+                return "";
+
             case 'HS256':
                 return hash_hmac('sha256', $input, $key, true);
 
