@@ -21,6 +21,8 @@ use OAuth2\ResponseType\AuthorizationCode as AuthorizationCodeResponseType;
 use OAuth2\ResponseType\AccessToken;
 use OAuth2\ResponseType\JwtAccessToken;
 use OAuth2\OpenID\ResponseType\CodeIdToken;
+use OAuth2\OpenID\ResponseType\CodeIdTokenToken;
+use OAuth2\OpenID\ResponseType\CodeToken;
 use OAuth2\OpenID\ResponseType\IdToken;
 use OAuth2\OpenID\ResponseType\IdTokenToken;
 use OAuth2\TokenType\TokenTypeInterface;
@@ -83,6 +85,8 @@ class Server implements ResourceControllerInterface,
         'id_token' => 'OAuth2\OpenID\ResponseType\IdTokenInterface',
         'id_token token' => 'OAuth2\OpenID\ResponseType\IdTokenTokenInterface',
         'code id_token' => 'OAuth2\OpenID\ResponseType\CodeIdTokenInterface',
+        'code id_token token' => 'OAuth2\OpenID\ResponseType\CodeIdTokenTokenInterface',
+        'code token' => 'OAuth2\OpenID\ResponseType\CodeTokenInterface',
     );
 
     /**
@@ -597,6 +601,10 @@ class Server implements ResourceControllerInterface,
                 }
                 $responseTypes['code'] = new OpenIDAuthorizationCodeResponseType($this->storages['authorization_code'], $config);
                 $responseTypes['code id_token'] = new CodeIdToken($responseTypes['code'], $responseTypes['id_token']);
+                if ($this->config['allow_implicit']) {
+                    $responseTypes['code token'] = new CodeToken($responseTypes['code'], $responseTypes['token']);
+                    $responseTypes['code id_token token'] = new CodeIdTokenToken($responseTypes['code token'], $responseTypes['id_token']);
+                }
             } else {
                 $responseTypes['code'] = new AuthorizationCodeResponseType($this->storages['authorization_code'], $config);
             }

@@ -16,9 +16,12 @@ class CodeIdToken implements CodeIdTokenInterface
     public function getAuthorizeResponse($params, $user_id = null)
     {
         $result = $this->authCode->getAuthorizeResponse($params, $user_id);
-        $id_token = $this->idToken->createIdToken($params['client_id'], $user_id, $params['nonce']);
-        $result[1]['query']['id_token'] = $id_token;
+        $authorization_code = $result[1]['query']['code'];
+        $result2 = $this->idToken->getAuthorizeResponse($params, $user_id, null, $authorization_code);
 
-        return $result;
+        // Merge Code query into IdToken fragment
+        $result2[1]['fragment'] = array_merge($result2[1]['fragment'], $result[1]['query']);
+
+        return $result2;
     }
 }
