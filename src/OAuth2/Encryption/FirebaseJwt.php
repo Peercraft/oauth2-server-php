@@ -20,13 +20,15 @@ class FirebaseJwt implements EncryptionInterface
         return \JWT::encode($payload, $key, $alg, $keyId);
     }
 
-    public function decode($jwt, $key = null, $allowedAlgorithms = null)
+    public function decode($jwt, $key = null, $allowedAlgorithms = true)
     {
         try {
 
             //Maintain BC: Do not verify if no algorithms are passed in.
             if (!$allowedAlgorithms) {
                 $key = null;
+            } elseif (!is_array($allowedAlgorithms)) {
+                $allowedAlgorithms = $this->getSigningAlgorithms();
             }
 
             return (array)\JWT::decode($jwt, $key, $allowedAlgorithms);
