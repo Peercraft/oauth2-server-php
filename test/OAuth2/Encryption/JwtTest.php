@@ -34,6 +34,9 @@ EOD;
     {
         $jwtUtil = new Jwt();
 
+        // test RS256 is a supported algorithm
+        $this->assertTrue(in_array('RS256', $jwtUtil->getSigningAlgorithms()));
+
         $params = array(
             'iss' => $client_id,
             'exp' => time() + 1000,
