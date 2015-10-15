@@ -8,9 +8,9 @@ namespace OAuth2\Encryption;
  */
 class Jwt implements EncryptionInterface
 {
-    public function encode($payload, $key, $algo = 'HS256', $kid = null)
+    public function encode($payload, $key, $algo = 'HS256', $keyId = null)
     {
-        $header = $this->generateJwtHeader($payload, $algo, $kid);
+        $header = $this->generateJwtHeader($payload, $algo, $keyId);
 
         $segments = array(
             $this->urlSafeB64Encode(json_encode($header)),
@@ -168,15 +168,15 @@ class Jwt implements EncryptionInterface
     /**
      * Override to create a custom header
      */
-    protected function generateJwtHeader($payload, $algorithm, $kid = null)
+    protected function generateJwtHeader($payload, $algorithm, $keyId = null)
     {
         $header = array(
             'typ' => 'JWT',
             'alg' => $algorithm,
         );
 
-        if (!is_null($kid)) {
-            $header['kid'] = $kid;
+        if (!is_null($keyId)) {
+            $header['kid'] = $keyId;
         }
 
         return $header;
