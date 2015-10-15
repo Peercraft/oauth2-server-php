@@ -86,7 +86,7 @@ class IdToken implements IdTokenInterface
     protected function createAtHash($access_token, $client_id = null)
     {
         // maps HS256 and RS256 to sha256, etc.
-        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id);
+        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'id_token');
         $hash_algorithm = 'sha' . substr($algorithm, 2);
         $hash = hash($hash_algorithm, $access_token, true);
         $at_hash = substr($hash, 0, strlen($hash) / 2);
@@ -96,10 +96,11 @@ class IdToken implements IdTokenInterface
 
     protected function encodeToken(array $token, $client_id = null)
     {
-        $private_key = $this->publicKeyStorage->getPrivateKey($client_id);
-        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id);
+        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'id_token');
+        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'id_token');
+        $private_key_id = $this->publicKeyStorage->getPrivateKeyId($client_id, 'id_token');
 
-        return $this->encryptionUtil->encode($token, $private_key, $algorithm);
+        return $this->encryptionUtil->encode($token, $private_key, $algorithm, $private_key_id);
     }
 
     private function getUserIdAndAuthTime($userInfo)

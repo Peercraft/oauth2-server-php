@@ -11,6 +11,11 @@ use OAuth2\ScopeInterface;
 use OAuth2\RequestInterface;
 use OAuth2\ResponseInterface;
 
+use OAuth2\Encryption\EncryptionInterface;
+use OAuth2\Encryption\Jwt;
+use OAuth2\Storage\PublicKeyInterface;
+use OAuth2\Storage\ClientInterface;
+
 /**
  * @see OAuth2\Controller\UserInfoControllerInterface
  */
@@ -23,12 +28,18 @@ class UserInfoController extends ResourceController implements UserInfoControlle
     protected $userClaimsStorage;
     protected $config;
     protected $scopeUtil;
+    protected $publicKeyStorage;
 
-    public function __construct(TokenTypeInterface $tokenType, AccessTokenInterface $tokenStorage, UserClaimsInterface $userClaimsStorage, $config = array(), ScopeInterface $scopeUtil = null)
+    public function __construct(TokenTypeInterface $tokenType, AccessTokenInterface $tokenStorage, UserClaimsInterface $userClaimsStorage, $config = array(), ScopeInterface $scopeUtil = null, PublicKeyInterface $publicKeyStorage = null, EncryptionInterface $encryptionUtil = null)
     {
         $this->tokenType = $tokenType;
         $this->tokenStorage = $tokenStorage;
         $this->userClaimsStorage = $userClaimsStorage;
+        $this->publicKeyStorage = $publicKeyStorage;
+        if (is_null($encryptionUtil)) {
+            $encryptionUtil = new Jwt();
+        }
+        $this->encryptionUtil = $encryptionUtil;
 
         $this->config = array_merge(array(
             'www_realm' => 'Service',
@@ -53,6 +64,24 @@ class UserInfoController extends ResourceController implements UserInfoControlle
         $claims += array(
             'sub' => $token['user_id'],
         );
-        $response->addParameters($claims);
+
+        if ($jwt = $this->encodeClaims($claims, $token['client_id'])) {
+            $response->setJWT( $jwt );
+        } else {
+            $response->addParameters($claims);
+        }
+    }
+
+    protected function encodeClaims(array $claims, $client_id)
+    {
+        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'userinfo');
+        if (empty($algorithm)) {
+            return false;
+        }
+
+        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'userinfo');
+        $private_key_id = $this->publicKeyStorage->getPrivateKeyId($client_id, 'userinfo');
+
+        return $this->encryptionUtil->encode($claims, $private_key, $algorithm, $private_key_id);
     }
 }

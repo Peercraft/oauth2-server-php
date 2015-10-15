@@ -6,6 +6,10 @@ use OAuth2\Controller\ResourceControllerInterface;
 use OAuth2\Controller\ResourceController;
 use OAuth2\OpenID\Controller\UserInfoControllerInterface;
 use OAuth2\OpenID\Controller\UserInfoController;
+use OAuth2\OpenID\Controller\DiscoveryControllerInterface;
+use OAuth2\OpenID\Controller\DiscoveryController;
+use OAuth2\OpenID\Controller\DynRegControllerInterface;
+use OAuth2\OpenID\Controller\DynRegController;
 use OAuth2\OpenID\Controller\AuthorizeController as OpenIDAuthorizeController;
 use OAuth2\OpenID\ResponseType\AuthorizationCode as OpenIDAuthorizationCodeResponseType;
 use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
@@ -46,7 +50,9 @@ use OAuth2\Storage\JwtAccessTokenInterface;
 class Server implements ResourceControllerInterface,
     AuthorizeControllerInterface,
     TokenControllerInterface,
-    UserInfoControllerInterface
+    UserInfoControllerInterface,
+    DiscoveryControllerInterface,
+    DynRegControllerInterface
 {
     // misc properties
     protected $response;
@@ -58,6 +64,8 @@ class Server implements ResourceControllerInterface,
     protected $tokenController;
     protected $resourceController;
     protected $userInfoController;
+    protected $discoveryController;
+    protected $dynRegController;
 
     // config classes
     protected $grantTypes;
@@ -180,6 +188,24 @@ class Server implements ResourceControllerInterface,
         }
 
         return $this->userInfoController;
+    }
+
+    public function getDiscoveryController()
+    {
+        if (is_null($this->discoveryController)) {
+            $this->discoveryController = $this->createDefaultDiscoveryController();
+        }
+
+        return $this->discoveryController;
+    }
+
+    public function getDynRegController()
+    {
+        if (is_null($this->dynRegController)) {
+            $this->dynRegController = $this->createDefaultDynRegController();
+        }
+
+        return $this->dynRegController;
     }
 
     /**
@@ -323,6 +349,42 @@ class Server implements ResourceControllerInterface,
     {
         $this->response = $response;
         $this->getAuthorizeController()->handleAuthorizeRequest($request, $this->response, $is_authorized, $user_id);
+
+        return $this->response;
+    }
+
+    /**
+     * Handle a discovery request
+     * This would be called from the "/discovery" endpoint as defined in the OpenID Connect Discovery spec
+     *
+     * @see http://openid.net/specs/openid-connect-discovery-1_0.html
+     *
+     * @param RequestInterface $request
+     * @param ResponseInterface $response
+     * @return Response|ResponseInterface
+     */
+    public function handleDiscoveryRequest(RequestInterface $request, ResponseInterface $response)
+    {
+        $this->response = $response;
+        $this->getDiscoveryController()->handleDiscoveryRequest($request, $this->response);
+
+        return $this->response;
+    }
+
+    /**
+     * Handle a dynamic client registration request
+     * This would be called from the "/dynamic_client_registration" endpoint as defined in the OpenID Connect Dynamic Client Registration spec
+     *
+     * @see http://openid.net/specs/openid-connect-registration-1_0.html
+     *
+     * @param RequestInterface $request
+     * @param ResponseInterface $response
+     * @return Response|ResponseInterface
+     */
+    public function handleDynRegRequest(RequestInterface $request, ResponseInterface $response)
+    {
+        $this->response = $response;
+        $this->getDynRegController()->handleDynRegRequest($request, $this->response);
 
         return $this->response;
     }
@@ -489,13 +551,13 @@ class Server implements ResourceControllerInterface,
             }
         }
 
-        $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri')));
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer')));
 
         if ($this->config['use_openid_connect']) {
-            return new OpenIDAuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
+            return new OpenIDAuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil(), $this->storages['public_key']);
         }
 
-        return new AuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
+        return new AuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil(), $this->storages['public_key']);
     }
 
     protected function createDefaultTokenController()
@@ -568,7 +630,22 @@ class Server implements ResourceControllerInterface,
 
         $config = array_intersect_key($this->config, array('www_realm' => ''));
 
-        return new UserInfoController($this->tokenType, $this->storages['access_token'], $this->storages['user_claims'], $config, $this->getScopeUtil());
+        return new UserInfoController($this->tokenType, $this->storages['access_token'], $this->storages['user_claims'], $config, $this->getScopeUtil(), $this->storages['public_key']);
+    }
+
+    protected function createDefaultDiscoveryController()
+    {
+        if (!isset($this->config['response_types_supported'])) {
+            $this->getAuthorizeController();
+            $this->config['response_types_supported'] = array_keys($this->responseTypes);
+        }
+
+        return new DiscoveryController($this->config, $this->storages);
+    }
+
+    protected function createDefaultDynRegController()
+    {
+        return new DynRegController($this->config, $this->storages['client']);
     }
 
     protected function getDefaultTokenType()

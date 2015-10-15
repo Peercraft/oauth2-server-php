@@ -18,6 +18,7 @@ class Response implements ResponseInterface
     protected $statusText;
     protected $parameters = array();
     protected $httpHeaders = array();
+    protected $jwt;
 
     public static $statusTexts = array(
         100 => 'Continue',
@@ -172,9 +173,21 @@ class Response implements ResponseInterface
         return isset($this->httpHeaders[$name]) ? $this->httpHeaders[$name] : $default;
     }
 
+    public function setJWT( $jwt )
+    {
+        $this->jwt = $jwt;
+    }
+
+    public function getJWT()
+    {
+        return $this->jwt;
+    }
+
     public function getResponseBody($format = 'json')
     {
         switch ($format) {
+            case 'jwt':
+                return $this->jwt;
             case 'json':
                 return json_encode($this->parameters);
             case 'xml':
@@ -198,7 +211,14 @@ class Response implements ResponseInterface
             return;
         }
 
+        if( $this->jwt ) {
+            $format = "jwt";
+        }
+
         switch ($format) {
+            case 'jwt':
+                $this->setHttpHeader('Content-Type', 'application/jwt');
+                break;
             case 'json':
                 $this->setHttpHeader('Content-Type', 'application/json');
                 break;
