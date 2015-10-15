@@ -71,6 +71,9 @@ class Jwt implements EncryptionInterface
     {
         // use constants when possible, for HipHop support
         switch ($algo) {
+            case'none':
+                return empty($signature);
+
             case'HS256':
             case'HS384':
             case'HS512':
