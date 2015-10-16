@@ -8,10 +8,27 @@ namespace OAuth2\Encryption;
  */
 class FirebaseJwt implements EncryptionInterface
 {
+    protected $kty_algo = array();
+
     public function __construct()
     {
         if (!class_exists('\JWT')) {
             throw new \ErrorException('firebase/php-jwt must be installed to use this feature. You can do this by running "composer require firebase/php-jwt"');
+        }
+
+        $algs = $this->getSigningAlgorithms();
+        foreach($algs as $alg) {
+            if ($alg==="none") {
+                $this->kty_algo['none'] = array('none');
+                continue;
+            }
+            $alg_first_two = substr($alg, 0, 2);
+            if ($alg_first_two === "HS" ||
+                $alg_first_two === "RS" ||
+                $alg_first_two === "ES" ||
+                $alg_first_two === "PS") {
+                $this->kty_algo[$alg_first_two][] = $alg;
+            }
         }
     }
 
@@ -35,6 +52,39 @@ class FirebaseJwt implements EncryptionInterface
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    public function secureDecode($jwt, array $keys, array $allowedAlgorithms = array())
+    {
+        $payload = false;
+        foreach($keys as $key) {
+            if (!isset($key['type'])) {
+                throw new \InvalidArgumentException("Key must have an type param");
+            }
+            if (!isset($key['key'])) {
+                throw new \InvalidArgumentException("Key must have an key param");
+            }
+            if (!isset($this->kty_algo[$key['type']])) {
+                throw new \InvalidArgumentException("Key type not supported");
+            }
+
+            if (!empty($allowedAlgorithms)) {
+                $key_allowed_algorithms = array_intersect($allowedAlgorithms, $this->kty_algo[$key['type']]);
+            } else {
+                $key_allowed_algorithms = $this->kty_algo[$key['type']];
+            }
+
+            if (empty($key_allowed_algorithms)) {
+                continue;
+            }
+
+            $payload = $this->decode($jwt, $key['key'], $key_allowed_algorithms);
+            if ($payload !== false) {
+                break;
+            }
+        }
+
+        return $payload;
     }
 
     public function getSigningAlgorithms()

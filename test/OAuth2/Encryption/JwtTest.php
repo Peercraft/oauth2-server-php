@@ -59,6 +59,22 @@ EOD;
         // test the new restricted algorithms header
         $payload = $jwtUtil->decode($encoded, $client_key, array('RS256'));
         $this->assertEquals($params, $payload);
+
+        // setup client keys array
+        $client_keys = array();
+        $client_keys[] = array('type' => 'RS', 'key' => $client_key);
+
+        // test secureDecode correctly decodes
+        $payload = $jwtUtil->secureDecode($encoded, $client_keys);
+        $this->assertEquals($params, $payload);
+
+        // test secureDecode correctly decodes with "double" restricted algorithms
+        $payload = $jwtUtil->secureDecode($encoded, $client_keys, array('RS256'));
+        $this->assertEquals($params, $payload);
+
+        // test secureDecode fails a correctly encoded token, but with a too easy algorithm
+        $payload = $jwtUtil->secureDecode($encoded, $client_keys, array('RS512'));
+        $this->assertFalse($payload);
     }
 
     public function testInvalidJwt()
@@ -88,7 +104,18 @@ EOD;
         $tampered = $jwtUtil->encode($params, $client_key, 'HS256');
 
         $payload = $jwtUtil->decode($tampered, $client_key, array('RS256'));
+        $this->assertFalse($payload);
 
+        // setup client keys array
+        $client_keys = array();
+        $client_keys[] = array('type' => 'RS', 'key' => $client_key);
+
+        // test secureDecode fails a tampered token even without limiting algorithms directly
+        $payload = $jwtUtil->secureDecode($tampered, $client_keys);
+        $this->assertFalse($payload);
+
+        // test secureDecode fails a tampered token with "double" algorithm restrictions
+        $payload = $jwtUtil->secureDecode($tampered, $client_keys, array('RS256'));
         $this->assertFalse($payload);
     }
 

@@ -8,6 +8,12 @@ namespace OAuth2\Encryption;
  */
 class Jwt implements EncryptionInterface
 {
+    protected $kty_algo = array(
+        'none' => array('none'),
+        'RS' => array('RS256', 'RS384', 'RS512'),
+        'HS' => array('HS256', 'HS384', 'HS512'),
+    );
+
     public function encode($payload, $key, $algo = 'HS256', $keyId = null)
     {
         $header = $this->generateJwtHeader($payload, $algo, $keyId);
@@ -61,6 +67,39 @@ class Jwt implements EncryptionInterface
 
             if (!$this->verifySignature($sig, "$headb64.$payloadb64", $key, $header['alg'])) {
                 return false;
+            }
+        }
+
+        return $payload;
+    }
+
+    public function secureDecode($jwt, array $keys, array $allowedAlgorithms = array())
+    {
+        $payload = false;
+        foreach($keys as $key) {
+            if (!isset($key['type'])) {
+                throw new \InvalidArgumentException("Key must have an type param");
+            }
+            if (!isset($key['key'])) {
+                throw new \InvalidArgumentException("Key must have an key param");
+            }
+            if (!isset($this->kty_algo[$key['type']])) {
+                throw new \InvalidArgumentException("Key type not supported");
+            }
+
+            if (!empty($allowedAlgorithms)) {
+                $key_allowed_algorithms = array_intersect($allowedAlgorithms, $this->kty_algo[$key['type']]);
+            } else {
+                $key_allowed_algorithms = $this->kty_algo[$key['type']];
+            }
+
+            if (empty($key_allowed_algorithms)) {
+                continue;
+            }
+
+            $payload = $this->decode($jwt, $key['key'], $key_allowed_algorithms);
+            if ($payload !== false) {
+                break;
             }
         }
 
