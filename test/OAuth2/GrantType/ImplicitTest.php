@@ -25,7 +25,7 @@ class ImplicitTest extends \PHPUnit_Framework_TestCase
         parse_str($parts['query'], $query);
 
         $this->assertEquals($query['error'], 'unsupported_response_type');
-        $this->assertEquals($query['error_description'], 'implicit grant type not supported');
+        $this->assertEquals($query['error_description'], 'token response type not supported');
     }
 
     public function testUserDeniesAccessResponse()

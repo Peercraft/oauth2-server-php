@@ -65,7 +65,7 @@ class AuthorizeControllerTest extends \PHPUnit_Framework_TestCase
         parse_str($parts['query'], $query);
 
         $this->assertEquals($query['error'], 'invalid_request');
-        $this->assertEquals($query['error_description'], 'Invalid or missing response type');
+        $this->assertEquals($query['error_description'], 'Missing response type');
     }
 
     public function testInvalidResponseTypeResponse()
@@ -83,8 +83,8 @@ class AuthorizeControllerTest extends \PHPUnit_Framework_TestCase
         $parts = parse_url($location);
         parse_str($parts['query'], $query);
 
-        $this->assertEquals($query['error'], 'invalid_request');
-        $this->assertEquals($query['error_description'], 'Invalid or missing response type');
+        $this->assertEquals($query['error'], 'unsupported_response_type');
+        $this->assertEquals($query['error_description'], 'invalid response type not supported');
     }
 
     public function testRedirectUriFragmentResponse()
