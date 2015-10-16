@@ -34,6 +34,9 @@ EOD;
     {
         $jwtUtil = new FirebaseJwt();
 
+        // test RS256 is a supported algorithm
+        $this->assertTrue(in_array('RS256', $jwtUtil->getSigningAlgorithms()));
+
         $params = array(
             'iss' => $client_id,
             'exp' => time() + 1000,
@@ -46,7 +49,7 @@ EOD;
         $encoded = $jwtUtil->encode($params, $this->privateKey, 'RS256');
 
         // test BC behaviour of trusting the algorithm in the header
-        $payload = $jwtUtil->decode($encoded, $client_key, array('RS256'));
+        $payload = $jwtUtil->decode($encoded, $client_key);
         $this->assertEquals($params, $payload);
 
         // test BC behaviour of not verifying by passing false

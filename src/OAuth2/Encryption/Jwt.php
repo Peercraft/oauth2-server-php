@@ -8,9 +8,9 @@ namespace OAuth2\Encryption;
  */
 class Jwt implements EncryptionInterface
 {
-    public function encode($payload, $key, $algo = 'HS256', $kid = null)
+    public function encode($payload, $key, $algo = 'HS256', $keyId = null)
     {
-        $header = $this->generateJwtHeader($payload, $algo, $kid);
+        $header = $this->generateJwtHeader($payload, $algo, $keyId);
 
         $segments = array(
             $this->urlSafeB64Encode(json_encode($header)),
@@ -71,6 +71,9 @@ class Jwt implements EncryptionInterface
     {
         // use constants when possible, for HipHop support
         switch ($algo) {
+            case'none':
+                return empty($signature);
+
             case'HS256':
             case'HS384':
             case'HS512':
@@ -80,7 +83,7 @@ class Jwt implements EncryptionInterface
                 );
 
             case 'RS256':
-                return openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA256') ? OPENSSL_ALGO_SHA256 : 'sha256')  === 1;
+                return @openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA256') ? OPENSSL_ALGO_SHA256 : 'sha256') === 1;
 
             case 'RS384':
                 return @openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA384') ? OPENSSL_ALGO_SHA384 : 'sha384') === 1;
@@ -168,15 +171,15 @@ class Jwt implements EncryptionInterface
     /**
      * Override to create a custom header
      */
-    protected function generateJwtHeader($payload, $algorithm, $kid = null)
+    protected function generateJwtHeader($payload, $algorithm, $keyId = null)
     {
         $header = array(
             'typ' => 'JWT',
             'alg' => $algorithm,
         );
 
-        if (!is_null($kid)) {
-            $header['kid'] = $kid;
+        if (!is_null($keyId)) {
+            $header['kid'] = $keyId;
         }
 
         return $header;
