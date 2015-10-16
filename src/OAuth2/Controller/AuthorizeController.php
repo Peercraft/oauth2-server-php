@@ -210,13 +210,13 @@ class AuthorizeController implements AuthorizeControllerInterface
 
         // type and client_id are required
         if (!$response_type) {
-            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Invalid or missing response type', null);
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Missing response type', null);
 
             return false;
         }
 
         if (!array_key_exists($response_type, $this->responseTypes)) {
-            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'authorization code grant type not supported', null);
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', $response_type . ' response type not supported', null);
 
             return false;
         }
@@ -233,11 +233,6 @@ class AuthorizeController implements AuthorizeControllerInterface
                 return false;
             }
         } else {
-            if (!$this->config['allow_implicit']) {
-                $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'implicit grant type not supported', null);
-
-                return false;
-            }
             if (!$this->clientStorage->checkRestrictedGrantType($client_id, 'implicit')) {
                 $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unauthorized_client', 'The grant type is unauthorized for this client_id', null);
 

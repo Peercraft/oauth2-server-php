@@ -544,6 +544,7 @@ class Server implements ResourceControllerInterface,
         if (0 == count($this->responseTypes)) {
             $this->responseTypes = $this->getDefaultResponseTypes();
         }
+        // @todo Should be removed in v2.0 - either depend on getDefaultResponseTypes() or supply all responseTypes yourself
         if ($this->config['use_openid_connect'] && !isset($this->responseTypes['id_token'])) {
             $this->responseTypes['id_token'] = $this->createDefaultIdTokenResponseType();
             if ($this->config['allow_implicit']) {
