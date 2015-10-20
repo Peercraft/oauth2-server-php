@@ -22,17 +22,17 @@ class UserClaimsTest extends BaseTest
         }
 
         // invalid user
-        $claims = $storage->getUserClaims('fake-user', '');
+        $claims = $storage->getUserClaims('fake-user', '', '');
         $this->assertFalse($claims);
 
         // valid user (no scope)
-        $claims = $storage->getUserClaims('testuser', '');
+        $claims = $storage->getUserClaims('testuser', '', '');
 
         /* assert the decoded token is the same */
         $this->assertFalse(isset($claims['email']));
 
         // valid user
-        $claims = $storage->getUserClaims('testuser', 'email');
+        $claims = $storage->getUserClaims('testuser', 'email', '');
 
         /* assert the decoded token is the same */
         $this->assertEquals($claims['email'], "testuser@test.com");

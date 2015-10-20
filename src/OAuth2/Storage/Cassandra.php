@@ -428,7 +428,7 @@ class Cassandra implements AuthorizationCodeInterface,
     }
 
     /* UserClaimsInterface */
-    public function getUserClaims($user_id, $claims)
+    public function getUserClaims($user_id, $claims, $client_id)
     {
         $userDetails = $this->getUserDetails($user_id);
         if (!is_array($userDetails)) {

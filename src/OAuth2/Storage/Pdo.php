@@ -257,7 +257,7 @@ class Pdo implements
     }
 
     /* UserClaimsInterface */
-    public function getUserClaims($user_id, $claims)
+    public function getUserClaims($user_id, $claims, $client_id)
     {
         if (!$userDetails = $this->getUserDetails($user_id)) {
             return false;

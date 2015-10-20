@@ -95,7 +95,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         }
 
         if (!is_null($request_jwt)) {
-            $algorithm = $this->clientStorage->getEncryptionAlgorithm($client_id, 'request_object');
+            $algorithm = $this->clientStorage->getEncryptionAlgorithm($this->getClientId(), 'request_object');
             $key = $this->clientStorage->getClientKey($this->getClientId(), 'request_object');
 
             if (!empty($algorithm)) {

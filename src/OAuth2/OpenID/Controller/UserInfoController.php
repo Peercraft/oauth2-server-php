@@ -61,9 +61,8 @@ class UserInfoController extends ResourceController implements UserInfoControlle
         $claims = $this->userClaimsStorage->getUserClaims($token['user_id'], $token['scope'], $token['client_id']);
         // The sub Claim MUST always be returned in the UserInfo Response.
         // http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($token['user_id']);
         $claims += array(
-            'sub' => $user_id,
+            'sub' => $token['user_id'],
         );
 
         if ($jwt = $this->encodeClaims($claims, $token['client_id'])) {
@@ -84,29 +83,5 @@ class UserInfoController extends ResourceController implements UserInfoControlle
         $private_key_id = $this->publicKeyStorage->getPrivateKeyId($client_id, 'userinfo');
 
         return $this->encryptionUtil->encode($claims, $private_key, $algorithm, $private_key_id);
-    }
-
-    private function getUserIdAndAuthTime($userInfo)
-    {
-        $auth_time = null;
-
-        // support an array for user_id / auth_time
-        if (is_array($userInfo)) {
-            if (!isset($userInfo['user_id'])) {
-                throw new \LogicException('if $user_id argument is an array, user_id index must be set');
-            }
-
-            $auth_time = isset($userInfo['auth_time']) ? $userInfo['auth_time'] : null;
-            $user_id = $userInfo['user_id'];
-        } else {
-            $user_id = $userInfo;
-        }
-
-        if (is_null($auth_time)) {
-            $auth_time = time();
-        }
-
-        // userInfo is a scalar, and so this is the $user_id. Auth Time is null
-        return array($user_id, $auth_time);
     }
 }
