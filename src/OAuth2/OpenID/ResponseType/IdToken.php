@@ -38,8 +38,7 @@ class IdToken implements IdTokenInterface
         $params += array('scope' => null, 'state' => null, 'nonce' => null);
 
         // create the id token.
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
-        $userClaims = $this->userClaimsStorage->getUserClaims($user_id, $params['scope']);
+        $userClaims = $this->userClaimsStorage->getUserClaims($userInfo, $params['scope'], $params['client_id']);
 
         $id_token = $this->createIdToken($params['client_id'], $userInfo, $params['nonce'], $userClaims, $access_token, $authorization_code);
         $result["fragment"] = array('id_token' => $id_token);
