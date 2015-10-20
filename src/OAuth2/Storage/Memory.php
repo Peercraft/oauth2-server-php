@@ -221,6 +221,33 @@ class Memory implements AuthorizationCodeInterface,
         return true;
     }
 
+    public function getClientScope($client_id)
+    {
+        if (!$clientDetails = $this->getClientDetails($client_id)) {
+            return false;
+        }
+
+        if (isset($clientDetails['scope'])) {
+            return $clientDetails['scope'];
+        }
+
+        return null;
+    }
+
+    public function getClientKey($client_id, $subject)
+    {
+        if (isset($this->jwt[$client_id])) {
+            $jwt = $this->jwt[$client_id];
+            if ($jwt) {
+                if ($jwt["subject"] == $subject) {
+                    return $jwt["key"];
+                }
+            }
+        }
+
+        return false;
+    }
+
     /* RefreshTokenInterface */
     public function getRefreshToken($refresh_token)
     {
@@ -275,33 +302,6 @@ class Memory implements AuthorizationCodeInterface,
     }
 
     /*JWTBearerInterface */
-    public function getClientKey($client_id, $subject)
-    {
-        if (isset($this->jwt[$client_id])) {
-            $jwt = $this->jwt[$client_id];
-            if ($jwt) {
-                if ($jwt["subject"] == $subject) {
-                    return $jwt["key"];
-                }
-            }
-        }
-
-        return false;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getJti($client_id, $subject, $audience, $expires, $jti)
     {
         foreach ($this->jti as $storedJti) {
@@ -325,13 +325,21 @@ class Memory implements AuthorizationCodeInterface,
     }
 
     /*PublicKeyInterface */
-    public function getPublicKey($client_id = null)
+    public function getPublicKey($client_id = null, $where = '')
     {
-        if (isset($this->keys[$client_id])) {
+        if (isset($this->keys[$client_id]['public_key'][$where])) {
+            return $this->keys[$client_id]['public_key'][$where];
+        }
+
+        if (isset($this->keys[$client_id]['public_key'])) {
             return $this->keys[$client_id]['public_key'];
         }
 
         // use a global encryption pair
+        if (isset($this->keys['public_key'][$where])) {
+            return $this->keys['public_key'][$where];
+        }
+
         if (isset($this->keys['public_key'])) {
             return $this->keys['public_key'];
         }
@@ -339,13 +347,21 @@ class Memory implements AuthorizationCodeInterface,
         return false;
     }
 
-    public function getPrivateKey($client_id = null)
+    public function getPrivateKey($client_id = null, $where = '')
     {
-        if (isset($this->keys[$client_id])) {
+        if (isset($this->keys[$client_id]['private_key'][$where])) {
+            return $this->keys[$client_id]['private_key'][$where];
+        }
+
+        if (isset($this->keys[$client_id]['private_key'])) {
             return $this->keys[$client_id]['private_key'];
         }
 
         // use a global encryption pair
+        if (isset($this->keys['private_key'][$where])) {
+            return $this->keys['private_key'][$where];
+        }
+
         if (isset($this->keys['private_key'])) {
             return $this->keys['private_key'];
         }
@@ -353,17 +369,39 @@ class Memory implements AuthorizationCodeInterface,
         return false;
     }
 
-    public function getEncryptionAlgorithm($client_id = null)
+    public function getPrivateKeyId($client_id = null, $where = '')
     {
-        if (isset($this->keys[$client_id]['encryption_algorithm'])) {
-            return $this->keys[$client_id]['encryption_algorithm'];
+        if (isset($this->keys[$client_id]['private_key_id'][$where])) {
+            return $this->keys[$client_id]['private_key_id'][$where];
+        }
+
+        if (isset($this->keys[$client_id]['private_key_id'])) {
+            return $this->keys[$client_id]['private_key_id'];
+        }
+
+        // use a global encryption pair
+        if (isset($this->keys['private_key_id'][$where])) {
+            return $this->keys['private_key_id'][$where];
+        }
+
+        if (isset($this->keys['private_key_id'])) {
+            return $this->keys['private_key_id'];
+        }
+
+        return '';
+    }
+
+    public function getEncryptionAlgorithm($client_id = null, $where = '')
+    {
+        if (isset($this->keys[$client_id]['encryption_algorithm'][$where])) {
+            return $this->keys[$client_id]['encryption_algorithm'][$where];
         }
 
         // use a global encryption algorithm
-        if (isset($this->keys['encryption_algorithm'])) {
-            return $this->keys['encryption_algorithm'];
+        if (isset($this->keys['encryption_algorithm'][$where])) {
+            return $this->keys['encryption_algorithm'][$where];
         }
 
-        return 'RS256';
+        return '';
     }
 }

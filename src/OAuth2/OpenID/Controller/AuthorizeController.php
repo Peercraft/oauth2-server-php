@@ -95,23 +95,13 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         }
 
         if (!is_null($request_jwt)) {
-            $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($this->getClientId(), 'request_object');
-            $keys = (array) $this->publicKeyStorage->getPublicKey($this->getClientId(), 'request_object');
+            $algorithm = $this->clientStorage->getEncryptionAlgorithm($client_id, 'request_object');
+            $key = $this->clientStorage->getClientKey($this->getClientId(), 'request_object');
 
-            if (empty($keys)) {
-                $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_request_object', 'got no valid keys');
-                return false;
-            }
-
-            $request_jwt_data = null;
-            foreach( $keys as $key ) {
-                try {
-                    if (!empty($algorithm)) {
-                        $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key, array( $algorithm ) );
-                    } else {
-                        $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key );
-                    }
-                } catch( Exception $e ) {}
+            if (!empty($algorithm)) {
+                $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key, array( $algorithm ) );
+            } else {
+                $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key );
             }
 
             if (empty($request_jwt_data)) {

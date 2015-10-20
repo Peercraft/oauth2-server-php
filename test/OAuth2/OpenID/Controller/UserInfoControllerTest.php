@@ -6,6 +6,7 @@ use OAuth2\Storage\Bootstrap;
 use OAuth2\Server;
 use OAuth2\Request;
 use OAuth2\Response;
+use OAuth2\Encryption\Jwt;
 
 class UserInfoControllerTest extends \PHPUnit_Framework_TestCase
 {
@@ -13,7 +14,7 @@ class UserInfoControllerTest extends \PHPUnit_Framework_TestCase
     {
         $tokenType = new \OAuth2\TokenType\Bearer();
         $storage = new \OAuth2\Storage\Memory();
-        $controller = new UserInfoController($tokenType, $storage, $storage);
+        $controller = new UserInfoController($tokenType, $storage, $storage, array(), null, $storage);
 
         $response = new Response();
         $controller->handleUserInfoRequest(new Request(), $response);
@@ -32,6 +33,32 @@ class UserInfoControllerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($parameters['sub'], 'testuser');
         $this->assertEquals($parameters['email'], 'testuser@test.com');
         $this->assertEquals($parameters['email_verified'], true);
+    }
+
+    public function testValidTokenJWT()
+    {
+        $server = $this->getTestServer();
+        $request = Request::createFromGlobals();
+        $request->headers['AUTHORIZATION'] = 'Bearer accesstoken-openid-connect-strong';
+        $response = new Response();
+
+        $server->handleUserInfoRequest($request, $response);
+
+        $jwt = $response->getJWT();
+        $this->assertNotEmpty($jwt);
+
+        $parameters = $response->getParameters();
+        $this->assertEmpty($parameters);
+
+        $jwtUtil = new Jwt();
+        $public_key = $server->getStorage('public_key')->getPublicKey("Test Strong Client ID", "userinfo");
+        $algorithm = $server->getStorage('public_key')->getEncryptionAlgorithm("Test Strong Client ID", "userinfo");
+        $payload = $jwtUtil->decode($jwt, $public_key, array($algorithm));
+
+        $this->assertNotEmpty($payload);
+        $this->assertEquals($payload['sub'], 'testuser');
+        $this->assertEquals($payload['email'], 'testuser@test.com');
+        $this->assertEquals($payload['email_verified'], true);
     }
 
     private function getTestServer($config = array())

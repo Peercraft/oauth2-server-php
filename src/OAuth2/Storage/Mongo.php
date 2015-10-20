@@ -124,6 +124,29 @@ class Mongo implements AuthorizationCodeInterface,
         return true;
     }
 
+    public function getClientScope($client_id)
+    {
+        if (!$clientDetails = $this->getClientDetails($client_id)) {
+            return false;
+        }
+
+        if (isset($clientDetails['scope'])) {
+            return $clientDetails['scope'];
+        }
+
+        return null;
+    }
+
+    public function getClientKey($client_id, $subject)
+    {
+        $result = $this->collection('jwt_table')->findOne(array(
+            'client_id' => $client_id,
+            'subject' => $subject
+        ));
+
+        return is_null($result) ? false : $result['key'];
+    }
+
     /* AccessTokenInterface */
     public function getAccessToken($access_token)
     {
@@ -294,29 +317,6 @@ class Mongo implements AuthorizationCodeInterface,
         }
 
         return true;
-    }
-
-    public function getClientKey($client_id, $subject)
-    {
-        $result = $this->collection('jwt_table')->findOne(array(
-            'client_id' => $client_id,
-            'subject' => $subject
-        ));
-
-        return is_null($result) ? false : $result['key'];
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
     }
 
     public function getJti($client_id, $subject, $audience, $expiration, $jti)

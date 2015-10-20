@@ -21,9 +21,11 @@ class PublicKeyTest extends BaseTest
         $configDir = Bootstrap::getInstance()->getConfigDir();
         $globalPublicKey  = file_get_contents($configDir.'/keys/id_rsa.pub');
         $globalPrivateKey = file_get_contents($configDir.'/keys/id_rsa');
+        $globalPrivateKeyId = '';
 
         /* assert values from storage */
         $this->assertEquals($storage->getPublicKey(), $globalPublicKey);
         $this->assertEquals($storage->getPrivateKey(), $globalPrivateKey);
+        $this->assertEquals($storage->getPrivateKeyId(), $globalPrivateKeyId);
     }
 }

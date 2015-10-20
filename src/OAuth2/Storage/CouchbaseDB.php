@@ -133,6 +133,32 @@ class CouchbaseDB implements AuthorizationCodeInterface,
         return true;
     }
 
+    public function getClientScope($client_id)
+    {
+        if (!$clientDetails = $this->getClientDetails($client_id)) {
+            return false;
+        }
+
+        if (isset($clientDetails['scope'])) {
+            return $clientDetails['scope'];
+        }
+
+        return null;
+    }
+
+    public function getClientKey($client_id, $subject)
+    {
+        if (!$jwt = $this->getObjectByType('jwt_table',$client_id)) {
+            return false;
+        }
+
+        if (isset($jwt['subject']) && $jwt['subject'] == $subject) {
+            return $jwt['key'];
+        }
+
+        return false;
+    }
+
     /* AccessTokenInterface */
     public function getAccessToken($access_token)
     {
@@ -289,32 +315,6 @@ class CouchbaseDB implements AuthorizationCodeInterface,
         }
 
         return true;
-    }
-
-    public function getClientKey($client_id, $subject)
-    {
-        if (!$jwt = $this->getObjectByType('jwt_table',$client_id)) {
-            return false;
-        }
-
-        if (isset($jwt['subject']) && $jwt['subject'] == $subject) {
-            return $jwt['key'];
-        }
-
-        return false;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
     }
 
     public function getJti($client_id, $subject, $audience, $expiration, $jti)

@@ -116,8 +116,8 @@ class JwtAccessToken extends AccessToken
 
     protected function encodeToken(array $token, $client_id = null)
     {
-        $private_key = $this->publicKeyStorage->getPrivateKey($client_id);
-        $algorithm   = $this->publicKeyStorage->getEncryptionAlgorithm($client_id);
+        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'jwtaccesstoken');
+        $algorithm   = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'jwtaccesstoken');
 
         return $this->encryptionUtil->encode($token, $private_key, $algorithm);
     }

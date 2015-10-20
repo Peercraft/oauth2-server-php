@@ -555,10 +555,10 @@ class Server implements ResourceControllerInterface,
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer')));
 
         if ($this->config['use_openid_connect']) {
-            return new OpenIDAuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil(), $this->storages['public_key']);
+            return new OpenIDAuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
         }
 
-        return new AuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil(), $this->storages['public_key']);
+        return new AuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
     }
 
     protected function createDefaultTokenController()

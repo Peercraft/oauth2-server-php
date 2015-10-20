@@ -30,7 +30,7 @@ class UserInfoController extends ResourceController implements UserInfoControlle
     protected $scopeUtil;
     protected $publicKeyStorage;
 
-    public function __construct(TokenTypeInterface $tokenType, AccessTokenInterface $tokenStorage, UserClaimsInterface $userClaimsStorage, $config = array(), ScopeInterface $scopeUtil = null, PublicKeyInterface $publicKeyStorage = null, EncryptionInterface $encryptionUtil = null)
+    public function __construct(TokenTypeInterface $tokenType, AccessTokenInterface $tokenStorage, UserClaimsInterface $userClaimsStorage, $config = array(), ScopeInterface $scopeUtil = null, PublicKeyInterface $publicKeyStorage, EncryptionInterface $encryptionUtil = null)
     {
         $this->tokenType = $tokenType;
         $this->tokenStorage = $tokenStorage;

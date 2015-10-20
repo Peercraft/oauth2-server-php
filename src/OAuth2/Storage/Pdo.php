@@ -127,6 +127,28 @@ class Pdo implements
         return true;
     }
 
+    public function getClientScope($client_id)
+    {
+        if (!$clientDetails = $this->getClientDetails($client_id)) {
+            return false;
+        }
+
+        if (isset($clientDetails['scope'])) {
+            return $clientDetails['scope'];
+        }
+
+        return null;
+    }
+
+    public function getClientKey($client_id, $subject)
+    {
+        $stmt = $this->db->prepare($sql = sprintf('SELECT public_key from %s where client_id=:client_id AND subject=:subject', $this->config['jwt_table']));
+
+        $stmt->execute(array('client_id' => $client_id, 'subject' => $subject));
+
+        return $stmt->fetchColumn();
+    }
+
     /* OAuth2\Storage\AccessTokenInterface */
     public function getAccessToken($access_token)
     {
@@ -372,28 +394,6 @@ class Pdo implements
     }
 
     /* JWTBearerInterface */
-    public function getClientKey($client_id, $subject)
-    {
-        $stmt = $this->db->prepare($sql = sprintf('SELECT public_key from %s where client_id=:client_id AND subject=:subject', $this->config['jwt_table']));
-
-        $stmt->execute(array('client_id' => $client_id, 'subject' => $subject));
-
-        return $stmt->fetchColumn();
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getJti($client_id, $subject, $audience, $expires, $jti)
     {
         $stmt = $this->db->prepare($sql = sprintf('SELECT * FROM %s WHERE issuer=:client_id AND subject=:subject AND audience=:audience AND expires=:expires AND jti=:jti', $this->config['jti_table']));
@@ -421,7 +421,7 @@ class Pdo implements
     }
 
     /* PublicKeyInterface */
-    public function getPublicKey($client_id = null)
+    public function getPublicKey($client_id = null, $where = null)
     {
         $stmt = $this->db->prepare($sql = sprintf('SELECT public_key FROM %s WHERE client_id=:client_id OR client_id IS NULL ORDER BY client_id IS NOT NULL DESC', $this->config['public_key_table']));
 
@@ -431,7 +431,7 @@ class Pdo implements
         }
     }
 
-    public function getPrivateKey($client_id = null)
+    public function getPrivateKey($client_id = null, $where = null)
     {
         $stmt = $this->db->prepare($sql = sprintf('SELECT private_key FROM %s WHERE client_id=:client_id OR client_id IS NULL ORDER BY client_id IS NOT NULL DESC', $this->config['public_key_table']));
 
@@ -441,7 +441,12 @@ class Pdo implements
         }
     }
 
-    public function getEncryptionAlgorithm($client_id = null)
+    public function getPrivateKeyId($client_id = null, $where = null)
+    {
+        return '';
+    }
+
+    public function getEncryptionAlgorithm($client_id = null, $where = null)
     {
         $stmt = $this->db->prepare($sql = sprintf('SELECT encryption_algorithm FROM %s WHERE client_id=:client_id OR client_id IS NULL ORDER BY client_id IS NOT NULL DESC', $this->config['public_key_table']));
 

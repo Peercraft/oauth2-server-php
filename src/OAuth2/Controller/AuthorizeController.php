@@ -26,7 +26,6 @@ class AuthorizeController implements AuthorizeControllerInterface
     protected $responseTypes;
     protected $config;
     protected $scopeUtil;
-    protected $publicKeyStorage;
     protected $encryptionUtil;
 
     /**
@@ -44,7 +43,7 @@ class AuthorizeController implements AuthorizeControllerInterface
      *                                                      </code>
      * @param OAuth2\ScopeInterface          $scopeUtil     OPTIONAL Instance of OAuth2\ScopeInterface to validate the requested scope
      */
-    public function __construct(ClientInterface $clientStorage, array $responseTypes = array(), array $config = array(), ScopeInterface $scopeUtil = null, PublicKeyInterface $publicKeyStorage = null, EncryptionInterface $encryptionUtil = null)
+    public function __construct(ClientInterface $clientStorage, array $responseTypes = array(), array $config = array(), ScopeInterface $scopeUtil = null, EncryptionInterface $encryptionUtil = null)
     {
         $this->clientStorage = $clientStorage;
         $this->responseTypes = $responseTypes;
@@ -62,8 +61,6 @@ class AuthorizeController implements AuthorizeControllerInterface
             $scopeUtil = new Scope();
         }
         $this->scopeUtil = $scopeUtil;
-
-        $this->publicKeyStorage = $publicKeyStorage;
 
         if (is_null($encryptionUtil)) {
             $encryptionUtil = new Jwt();

@@ -147,6 +147,33 @@ class DynamoDB implements
         return true;
     }
 
+    public function getClientScope($client_id)
+    {
+        if (!$clientDetails = $this->getClientDetails($client_id)) {
+            return false;
+        }
+
+        if (isset($clientDetails['scope'])) {
+            return $clientDetails['scope'];
+        }
+
+        return null;
+    }
+
+    public function getClientKey($client_id, $subject)
+    {
+        $result = $this->client->getItem(array(
+            "TableName"=> $this->config['jwt_table'],
+            "Key" => array('client_id'   => array('S' => $client_id), 'subject' => array('S' => $subject))
+        ));
+        if ($result->count()==0) {
+            return false ;
+        }
+        $token = $this->dynamo2array($result);
+
+        return $token['public_key'];
+    }
+
     /* OAuth2\Storage\AccessTokenInterface */
     public function getAccessToken($access_token)
     {
@@ -428,33 +455,6 @@ class DynamoDB implements
     }
 
     /* JWTBearerInterface */
-    public function getClientKey($client_id, $subject)
-    {
-        $result = $this->client->getItem(array(
-            "TableName"=> $this->config['jwt_table'],
-            "Key" => array('client_id'   => array('S' => $client_id), 'subject' => array('S' => $subject))
-        ));
-        if ($result->count()==0) {
-            return false ;
-        }
-        $token = $this->dynamo2array($result);
-
-        return $token['public_key'];
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getJti($client_id, $subject, $audience, $expires, $jti)
     {
         //TODO not use.
@@ -466,7 +466,7 @@ class DynamoDB implements
     }
 
     /* PublicKeyInterface */
-    public function getPublicKey($client_id = '0')
+    public function getPublicKey($client_id = '0', $where = null)
     {
 
         $result = $this->client->getItem(array(
@@ -482,7 +482,7 @@ class DynamoDB implements
 
     }
 
-    public function getPrivateKey($client_id = '0')
+    public function getPrivateKey($client_id = '0', $where = null)
     {
         $result = $this->client->getItem(array(
             "TableName"=> $this->config['public_key_table'],
@@ -496,7 +496,12 @@ class DynamoDB implements
         return $token['private_key'];
     }
 
-    public function getEncryptionAlgorithm($client_id = null)
+    public function getPrivateKeyId($client_id = null, $where = null)
+    {
+        return '';
+    }
+
+    public function getEncryptionAlgorithm($client_id = null, $where = null)
     {
         $result = $this->client->getItem(array(
             "TableName"=> $this->config['public_key_table'],

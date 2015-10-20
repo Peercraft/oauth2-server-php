@@ -40,8 +40,8 @@ class JwtAccessToken implements JwtAccessTokenInterface
         }
 
         $client_id  = isset($tokenData['aud']) ? $tokenData['aud'] : null;
-        $public_key = $this->publicKeyStorage->getPublicKey($client_id);
-        $algorithm  = $this->publicKeyStorage->getEncryptionAlgorithm($client_id);
+        $public_key = $this->publicKeyStorage->getPublicKey($client_id, 'jwtaccesstoken');
+        $algorithm  = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'jwtaccesstoken');
 
         // now that we have the client_id, verify the token
         if (false === $this->encryptionUtil->decode($oauth_token, $public_key, array($algorithm))) {

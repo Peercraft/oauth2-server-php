@@ -63,4 +63,17 @@ interface ClientInterface
      * @ingroup oauth2_section_4
      */
     public function checkRestrictedGrantType($client_id, $grant_type);
+
+    /**
+     * Get the public key associated with a client_id
+     *
+     * @param $client_id
+     * Client identifier to be checked with.
+     *
+     * @return
+     * STRING Return the public key for the client_id if it exists, and MUST return FALSE if it doesn't.
+     */
+    public function getClientKey($client_id, $subject);
+
+    public function getEncryptionAlgorithm($client_id = null, $where = null);
 }

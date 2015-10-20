@@ -259,6 +259,19 @@ class Cassandra implements AuthorizationCodeInterface,
         return true;
     }
 
+    public function getClientKey($client_id, $subject)
+    {
+        if (!$jwt = $this->getValue($this->config['jwt_key'] . $client_id)) {
+            return false;
+        }
+
+        if (isset($jwt['subject']) && $jwt['subject'] == $subject ) {
+            return $jwt['key'];
+        }
+
+        return null;
+    }
+
     /* RefreshTokenInterface */
     public function getRefreshToken($refresh_token)
     {
@@ -336,19 +349,6 @@ class Cassandra implements AuthorizationCodeInterface,
     }
 
     /*JWTBearerInterface */
-    public function getClientKey($client_id, $subject)
-    {
-        if (!$jwt = $this->getValue($this->config['jwt_key'] . $client_id)) {
-            return false;
-        }
-
-        if (isset($jwt['subject']) && $jwt['subject'] == $subject ) {
-            return $jwt['key'];
-        }
-
-        return null;
-    }
-
     public function setClientKey($client_id, $key, $subject = null)
     {
         return $this->setValue($this->config['jwt_key'] . $client_id, array(
@@ -384,7 +384,7 @@ class Cassandra implements AuthorizationCodeInterface,
     }
 
     /* PublicKeyInterface */
-    public function getPublicKey($client_id = '')
+    public function getPublicKey($client_id = '', $where = null)
     {
         $public_key = $this->getValue($this->config['public_key_key'] . $client_id);
         if (is_array($public_key)) {
@@ -396,7 +396,7 @@ class Cassandra implements AuthorizationCodeInterface,
         }
     }
 
-    public function getPrivateKey($client_id = '')
+    public function getPrivateKey($client_id = '', $where = null)
     {
         $public_key = $this->getValue($this->config['public_key_key'] . $client_id);
         if (is_array($public_key)) {
@@ -408,7 +408,12 @@ class Cassandra implements AuthorizationCodeInterface,
         }
     }
 
-    public function getEncryptionAlgorithm($client_id = null)
+    public function getPrivateKeyId($client_id = null, $where = null)
+    {
+        return '';
+    }
+
+    public function getEncryptionAlgorithm($client_id = null, $where = null)
     {
         $public_key = $this->getValue($this->config['public_key_key'] . $client_id);
         if (is_array($public_key)) {

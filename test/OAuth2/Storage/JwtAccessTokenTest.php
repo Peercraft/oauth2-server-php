@@ -25,7 +25,7 @@ class JwtAccessTokenTest extends BaseTest
             'scope'   => 'foo',
         );
 
-        $token = $encryptionUtil->encode($jwtAccessToken, $storage->getPrivateKey(), $storage->getEncryptionAlgorithm());
+        $token = $encryptionUtil->encode($jwtAccessToken, $storage->getPrivateKey(), $storage->getEncryptionAlgorithm(), $storage->getPrivateKeyId());
 
         $this->assertNotNull($token);
 
