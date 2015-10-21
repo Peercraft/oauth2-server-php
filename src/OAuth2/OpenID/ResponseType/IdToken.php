@@ -103,7 +103,7 @@ class IdToken implements IdTokenInterface
         return $this->encryptionUtil->encode($token, $private_key, $algorithm, $private_key_id);
     }
 
-    private function getUserIdAndAuthTime($userInfo)
+    protected function getUserIdAndAuthTime($userInfo)
     {
         $auth_time = null;
 
