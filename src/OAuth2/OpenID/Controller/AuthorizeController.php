@@ -198,20 +198,6 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         return $response;
     }
 
-    // @todo remove in v2.0
-    protected function getValidResponseTypes()
-    {
-        return array(
-            self::RESPONSE_TYPE_ACCESS_TOKEN,
-            self::RESPONSE_TYPE_AUTHORIZATION_CODE,
-            self::RESPONSE_TYPE_ID_TOKEN,
-            self::RESPONSE_TYPE_ID_TOKEN_TOKEN,
-            self::RESPONSE_TYPE_CODE_ID_TOKEN,
-            self::RESPONSE_TYPE_CODE_TOKEN,
-            self::RESPONSE_TYPE_CODE_ID_TOKEN_TOKEN,
-        );
-    }
-
     /**
      * Returns whether the current request needs to generate an id token.
      *

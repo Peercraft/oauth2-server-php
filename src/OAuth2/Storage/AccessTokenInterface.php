@@ -56,8 +56,6 @@ interface AccessTokenInterface
      * Access token to be expired.
      *
      * @ingroup oauth2_section_6
-     *
-     * @todo v2.0 include this method in interface. Omitted to maintain BC in v1.x
      */
-    //public function unsetAccessToken($access_token);
+    public function unsetAccessToken($access_token);
 }

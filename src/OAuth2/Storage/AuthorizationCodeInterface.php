@@ -12,16 +12,6 @@ namespace OAuth2\Storage;
 interface AuthorizationCodeInterface
 {
     /**
-     * The Authorization Code grant type supports a response type of "code".
-     *
-     * @var string
-     * @see http://tools.ietf.org/html/rfc6749#section-1.4.1
-     * @see http://tools.ietf.org/html/rfc6749#section-4.2
-     * @todo remove in v2.0
-     */
-    const RESPONSE_TYPE_CODE = "code";
-
-    /**
      * Fetch authorization code data (probably the most common grant type).
      *
      * Retrieve the stored data for the given authorization code.

@@ -27,8 +27,6 @@ interface AccessTokenInterface extends ResponseTypeInterface
      * @param $token
      * @param $tokenTypeHint
      * @return mixed
-     *
-     * @todo v2.0 include this method in interface. Omitted to maintain BC in v1.x
      */
-    //public function revokeToken($token, $tokenTypeHint);
+    public function revokeToken($token, $tokenTypeHint);
 }

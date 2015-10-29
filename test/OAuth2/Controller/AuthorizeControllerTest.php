@@ -459,6 +459,7 @@ class AuthorizeControllerTest extends \PHPUnit_Framework_TestCase
         $server = $this->getTestServer(array(
             'use_openid_connect' => true,
             'issuer' => 'bojanz',
+            'allow_implicit' => true,
         ));
 
         $request = new Request(array(

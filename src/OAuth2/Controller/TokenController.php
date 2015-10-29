@@ -261,12 +261,6 @@ class TokenController implements TokenControllerInterface
             return null;
         }
 
-        // @todo remove this check for v2.0
-        if (!method_exists($this->accessToken, 'revokeToken')) {
-            $class = get_class($this->accessToken);
-            throw new \RuntimeException("AccessToken {$class} does not implement required revokeToken method");
-        }
-
         $this->accessToken->revokeToken($token, $token_type_hint);
 
         return true;

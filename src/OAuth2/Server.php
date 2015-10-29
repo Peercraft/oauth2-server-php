@@ -544,13 +544,6 @@ class Server implements ResourceControllerInterface,
         if (0 == count($this->responseTypes)) {
             $this->responseTypes = $this->getDefaultResponseTypes();
         }
-        // @todo Should be removed in v2.0 - either depend on getDefaultResponseTypes() or supply all responseTypes yourself
-        if ($this->config['use_openid_connect'] && !isset($this->responseTypes['id_token'])) {
-            $this->responseTypes['id_token'] = $this->createDefaultIdTokenResponseType();
-            if ($this->config['allow_implicit']) {
-                $this->responseTypes['id_token token'] = $this->createDefaultIdTokenTokenResponseType();
-            }
-        }
 
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer')));
 
@@ -662,11 +655,8 @@ class Server implements ResourceControllerInterface,
 
         if ($this->config['allow_implicit']) {
             $responseTypes['token'] = $this->getAccessTokenResponseType();
-        }
-
-        if ($this->config['use_openid_connect']) {
-            $responseTypes['id_token'] = $this->getIdTokenResponseType();
-            if ($this->config['allow_implicit']) {
+            if ($this->config['use_openid_connect']) {
+                $responseTypes['id_token'] = $this->getIdTokenResponseType();
                 $responseTypes['id_token token'] = $this->getIdTokenTokenResponseType();
             }
         }
@@ -678,8 +668,8 @@ class Server implements ResourceControllerInterface,
                     throw new \LogicException("Your authorization_code storage must implement OAuth2\OpenID\Storage\AuthorizationCodeInterface to work when 'use_openid_connect' is true");
                 }
                 $responseTypes['code'] = new OpenIDAuthorizationCodeResponseType($this->storages['authorization_code'], $config);
-                $responseTypes['code id_token'] = new CodeIdToken($responseTypes['code'], $responseTypes['id_token']);
                 if ($this->config['allow_implicit']) {
+                    $responseTypes['code id_token'] = new CodeIdToken($responseTypes['code'], $responseTypes['id_token']);
                     $responseTypes['code token'] = new CodeToken($responseTypes['code'], $responseTypes['token']);
                     $responseTypes['code id_token token'] = new CodeIdTokenToken($responseTypes['code token'], $responseTypes['id_token']);
                 }
