@@ -4,7 +4,8 @@ namespace OAuth2\GrantType;
 
 use OAuth2\ClientAssertionType\ClientAssertionTypeInterface;
 use OAuth2\Storage\JwtBearerInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Storage\PublicKeyInterface;
+use OAuth2\Encryption\SpomkyLabsJwt;
 use OAuth2\Encryption\EncryptionInterface;
 use OAuth2\ResponseType\AccessTokenInterface;
 use OAuth2\RequestInterface;
@@ -22,35 +23,33 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
 {
     private $jwt;
 
-    protected $storage;
+    protected $jtiStorage;
+    protected $publicKeyStorage;
     protected $audience;
-    protected $jwtUtil;
-    protected $allowedAlgorithms;
+    protected $encryptionUtil;
 
     /**
      * Creates an instance of the JWT bearer grant type.
      *
-     * @param OAuth2\Storage\JWTBearerInterface|JwtBearerInterface $storage A valid storage interface that implements storage hooks for the JWT bearer grant type.
+     * @param OAuth2\Storage\JWTBearerInterface|JwtBearerInterface $jtiStorage A valid storage interface that implements storage hooks for the JWT bearer grant type.
      * @param string $audience The audience to validate the token against. This is usually the full URI of the OAuth token requests endpoint.
-     * @param EncryptionInterface|OAuth2\Encryption\JWT $jwtUtil OPTONAL The class used to decode, encode and verify JWTs.
+     * @param EncryptionInterface|OAuth2\Encryption\JWT $encryptionUtil OPTONAL The class used to decode, encode and verify JWTs.
      * @param array $config
      */
-    public function __construct(JwtBearerInterface $storage, $audience, EncryptionInterface $jwtUtil = null, array $config = array())
+    public function __construct(JwtBearerInterface $jtiStorage, PublicKeyInterface $publicKeyStorage, $audience, array $config = array(), EncryptionInterface $encryptionUtil = null)
     {
-        $this->storage = $storage;
+        $this->jtiStorage = $jtiStorage;
+        $this->publicKeyStorage = $publicKeyStorage;
         $this->audience = $audience;
 
-        if (is_null($jwtUtil)) {
-            $jwtUtil = new Jwt();
-        }
-
         $this->config = array_merge(array(
-            'allowed_algorithms' => array('RS256', 'RS384', 'RS512')
+            'allowed_algorithms' => 'all',
         ), $config);
 
-        $this->jwtUtil = $jwtUtil;
-
-        $this->allowedAlgorithms = $this->config['allowed_algorithms'];
+        if (is_null($encryptionUtil)) {
+            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
+        }
+        $this->encryptionUtil = $encryptionUtil;
     }
 
     /**
@@ -83,13 +82,53 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
         }
 
         // Store the undecoded JWT for later use
-        $undecodedJWT = $request->request('assertion');
+        $assertion = $request->request('assertion');
 
         // Decode the JWT
-        $jwt = $this->jwtUtil->decode($request->request('assertion'), null, false);
+        $private_keys = $this->publicKeyStorage->getPrivateDecryptionKeys(null, 'jwtbearer');
+        $unsafe_jwt = $this->encryptionUtil->unsafeDecode($assertion, $private_keys); 
 
-        if (!$jwt) {
+        if (!$unsafe_jwt) {
             $response->setError(400, 'invalid_request', "JWT is malformed");
+
+            return null;
+        }
+
+        if (!isset($unsafe_jwt['iss'])) {
+            $response->setError(400, 'invalid_grant', "Invalid issuer (iss) provided");
+
+            return null;
+        }
+
+        list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($unsafe_jwt['iss'], 'jwtbearer');
+
+        $private_keys = $this->publicKeyStorage->getPrivateDecryptionKeys($unsafe_jwt['iss'], 'jwtbearer');
+        try {
+            $decrypted_jwt = $this->encryptionUtil->decrypt($private_keys, $assertion, null, null, $this->config['issuer']);
+            if (!empty($decrypted_jwt)) {
+                $assertion = $decrypted_jwt;
+            }
+        } catch( \RuntimeArgumentException $e ) {
+            $response->setError(400, 'invalid_grant', "JWT failed decryption");
+
+            return null;
+        }
+
+        $public_keys = $this->publicKeyStorage->getClientKeys($unsafe_jwt['iss'], 'jwtbearer');
+        if (empty($public_keys)) {
+            $response->setError(400, 'invalid_grant', "Invalid issuer (iss) or no keys provided");
+
+            return null;
+        }
+
+        try {
+            if (!empty($sig_alg)) {
+                $jwt = $this->encryptionUtil->verify($public_keys, $assertion, $sig_alg, $this->audience);
+            } else {
+                $jwt = $this->encryptionUtil->verify($public_keys, $assertion, null, $this->audience);
+            }
+        } catch( \RuntimeArgumentException $e ) {
+            $response->setError(400, 'invalid_grant', "JWT failed signature verification");
 
             return null;
         }
@@ -108,12 +147,6 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
             'typ' => null,
         ), $jwt);
 
-        if (!isset($jwt['iss'])) {
-            $response->setError(400, 'invalid_grant', "Invalid issuer (iss) provided");
-
-            return null;
-        }
-
         if (!isset($jwt['sub'])) {
             $response->setError(400, 'invalid_grant', "Invalid subject (sub) provided");
 
@@ -126,45 +159,10 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
             return null;
         }
 
-        // Check expiration
-        if (ctype_digit($jwt['exp'])) {
-            if ($jwt['exp'] <= time()) {
-                $response->setError(400, 'invalid_grant', "JWT has expired");
-
-                return null;
-            }
-        } else {
-            $response->setError(400, 'invalid_grant', "Expiration (exp) time must be a unix time stamp");
-
-            return null;
-        }
-
-        // Check the not before time
-        if ($notBefore = $jwt['nbf']) {
-            if (ctype_digit($notBefore)) {
-                if ($notBefore > time()) {
-                    $response->setError(400, 'invalid_grant', "JWT cannot be used before the Not Before (nbf) time");
-
-                    return null;
-                }
-            } else {
-                $response->setError(400, 'invalid_grant', "Not Before (nbf) time must be a unix time stamp");
-
-                return null;
-            }
-        }
-
-        // Check the audience if required to match
-        if (!isset($jwt['aud']) || ($jwt['aud'] != $this->audience)) {
-            $response->setError(400, 'invalid_grant', "Invalid audience (aud)");
-
-            return null;
-        }
-
         // Check the jti (nonce)
         // @see http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-13#section-4.1.7
         if (isset($jwt['jti'])) {
-            $jti = $this->storage->getJti($jwt['iss'], $jwt['sub'], $jwt['aud'], $jwt['exp'], $jwt['jti']);
+            $jti = $this->jtiStorage->getJti($jwt['iss'], $jwt['sub'], $jwt['aud'], $jwt['exp'], $jwt['jti']);
 
             //Reject if jti is used and jwt is still valid (exp parameter has not expired).
             if ($jti && $jti['expires'] > time()) {
@@ -172,23 +170,8 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
 
                 return null;
             } else {
-                $this->storage->setJti($jwt['iss'], $jwt['sub'], $jwt['aud'], $jwt['exp'], $jwt['jti']);
+                $this->jtiStorage->setJti($jwt['iss'], $jwt['sub'], $jwt['aud'], $jwt['exp'], $jwt['jti']);
             }
-        }
-
-        // Get the iss's public key
-        // @see http://tools.ietf.org/html/draft-ietf-oauth-json-web-token-06#section-4.1.1
-        if (!$key = $this->storage->getClientKey($jwt['iss'], $jwt['sub'])) {
-            $response->setError(400, 'invalid_grant', "Invalid issuer (iss) or subject (sub) provided");
-
-            return null;
-        }
-
-        // Verify the JWT
-        if (!$this->jwtUtil->decode($undecodedJWT, $key, $this->allowedAlgorithms)) {
-            $response->setError(400, 'invalid_grant', "JWT failed signature verification");
-
-            return null;
         }
 
         $this->jwt = $jwt;

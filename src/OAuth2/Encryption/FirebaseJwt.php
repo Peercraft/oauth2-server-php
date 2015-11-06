@@ -16,7 +16,7 @@ class FirebaseJwt implements EncryptionInterface
             throw new \ErrorException('firebase/php-jwt must be installed to use this feature. You can do this by running "composer require firebase/php-jwt"');
         }
 
-        $algs = $this->getSigningAlgorithms();
+        $algs = $this->getSignatureAlgorithms();
         foreach($algs as $alg) {
             if ($alg==="none") {
                 $this->kty_algo['none'] = array('none');
@@ -45,7 +45,7 @@ class FirebaseJwt implements EncryptionInterface
             if (!$allowedAlgorithms) {
                 $key = null;
             } elseif (!is_array($allowedAlgorithms)) {
-                $allowedAlgorithms = $this->getSigningAlgorithms();
+                $allowedAlgorithms = $this->getSignatureAlgorithms();
             }
 
             return (array)\JWT::decode($jwt, $key, $allowedAlgorithms);
@@ -87,17 +87,17 @@ class FirebaseJwt implements EncryptionInterface
         return $payload;
     }
 
-    public function getSigningAlgorithms()
+    public function getSignatureAlgorithms()
     {
         return array_keys(\JWT::$supported_algs);
     }
 
-    public function getEncryptionAlgorithms_alg()
+    public function getKeyEncryptionAlgorithms()
     {
         return array();
     }
 
-    public function getEncryptionAlgorithms_enc()
+    public function getContentEncryptionAlgorithms()
     {
         return array();
     }

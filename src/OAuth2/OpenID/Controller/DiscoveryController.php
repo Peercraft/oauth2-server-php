@@ -6,7 +6,7 @@ use OAuth2\RequestInterface;
 use OAuth2\ResponseInterface;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 
 /**
  * @see OAuth2\Controller\DiscoveryControllerInterface
@@ -17,10 +17,13 @@ class DiscoveryController implements DiscoveryControllerInterface
 
     public function __construct($config, $storages = array(), EncryptionInterface $encryptionUtil = null)
     {
-        $this->config = $config;
+        $this->config = array_merge(array(
+            'allowed_algorithms' => 'all',
+        ), $config);
+
         $this->storages = $storages;
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt();
+            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
 
@@ -35,7 +38,7 @@ class DiscoveryController implements DiscoveryControllerInterface
             $this->config['grant_types_supported'] = $grant_types_supported;
         }
 
-        $signing_algorithms = $this->encryptionUtil->getSigningAlgorithms();
+        $signing_algorithms = $this->encryptionUtil->getSignatureAlgorithms();
         $signing_algorithms_without_none = array_values(array_diff($signing_algorithms, array('none')));
         if (!isset($this->config['id_token_signing_alg_values_supported'])) {
             $this->config['id_token_signing_alg_values_supported'] = $signing_algorithms;
@@ -50,7 +53,7 @@ class DiscoveryController implements DiscoveryControllerInterface
             $this->config['token_endpoint_auth_signing_alg_values_supported'] = $signing_algorithms_without_none;
         }
 
-        $encryption_algorithms_alg = $this->encryptionUtil->getEncryptionAlgorithms_alg();
+        $encryption_algorithms_alg = $this->encryptionUtil->getKeyEncryptionAlgorithms();
         if (!isset($this->config['id_token_encryption_alg_values_supported'])) {
             $this->config['id_token_encryption_alg_values_supported'] = $encryption_algorithms_alg;
         }
@@ -61,7 +64,7 @@ class DiscoveryController implements DiscoveryControllerInterface
             $this->config['request_object_encryption_alg_values_supported'] = $encryption_algorithms_alg;
         }
 
-        $encryption_algorithms_enc = $this->encryptionUtil->getEncryptionAlgorithms_enc();
+        $encryption_algorithms_enc = $this->encryptionUtil->getContentEncryptionAlgorithms();
         if (!isset($this->config['id_token_encryption_enc_values_supported'])) {
             $this->config['id_token_encryption_enc_values_supported'] = $encryption_algorithms_enc;
         }

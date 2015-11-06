@@ -12,7 +12,7 @@ use OAuth2\RequestInterface;
 use OAuth2\ResponseInterface;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 use OAuth2\Storage\PublicKeyInterface;
 use OAuth2\Storage\ClientInterface;
 
@@ -35,20 +35,21 @@ class UserInfoController extends ResourceController implements UserInfoControlle
         $this->tokenType = $tokenType;
         $this->tokenStorage = $tokenStorage;
         $this->userClaimsStorage = $userClaimsStorage;
-        $this->publicKeyStorage = $publicKeyStorage;
-        if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt();
-        }
-        $this->encryptionUtil = $encryptionUtil;
-
         $this->config = array_merge(array(
             'www_realm' => 'Service',
+            'allowed_algorithms' => 'all',
         ), $config);
+        $this->publicKeyStorage = $publicKeyStorage;
 
         if (is_null($scopeUtil)) {
             $scopeUtil = new Scope();
         }
         $this->scopeUtil = $scopeUtil;
+
+        if (is_null($encryptionUtil)) {
+            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
+        }
+        $this->encryptionUtil = $encryptionUtil;
     }
 
     public function handleUserInfoRequest(RequestInterface $request, ResponseInterface $response)
@@ -65,23 +66,31 @@ class UserInfoController extends ResourceController implements UserInfoControlle
             'sub' => $token['user_id'],
         );
 
-        if ($jwt = $this->encodeClaims($claims, $token['client_id'])) {
+        if ($jwt = $this->encodeToken($claims, $token['client_id'])) {
             $response->setJWT( $jwt );
         } else {
             $response->addParameters($claims);
         }
     }
 
-    protected function encodeClaims(array $claims, $client_id)
+    protected function encodeToken(array $claims, $client_id)
     {
-        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'userinfo');
-        if (empty($algorithm)) {
+        list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($client_id, 'userinfo');
+
+        if (empty($sig_alg) && empty($enc_alg)) {
             return false;
         }
 
-        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'userinfo');
-        $private_key_id = $this->publicKeyStorage->getPrivateKeyId($client_id, 'userinfo');
+        if (!empty($sig_alg)) {
+            $private_keys = $this->publicKeyStorage->getPrivateSigningKeys($client_id, 'userinfo');
+            $claims = $this->encryptionUtil->sign($private_keys, $claims, $sig_alg);
+        }
 
-        return $this->encryptionUtil->encode($claims, $private_key, $algorithm, $private_key_id);
+        if (!empty($enc_alg)) {
+            $public_keys = $this->publicKeyStorage->getClientKeys($client_id, 'userinfo');
+            $claims = $this->encryptionUtil->encrypt($public_keys, $claims, $enc_alg, $enc_enc);
+        }
+
+        return $claims;
     }
 }

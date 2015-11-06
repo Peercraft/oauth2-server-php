@@ -3,7 +3,7 @@
 namespace OAuth2\Storage;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 
 /**
  *
@@ -22,12 +22,16 @@ class JwtAccessToken implements JwtAccessTokenInterface
      *                                                                is not necessary when using this grant type.
      * @param OAuth2\Encryption\EncryptionInterface $encryptionUtil   OPTIONAL class to use for "encode" and "decode" functions.
      */
-    public function __construct(PublicKeyInterface $publicKeyStorage, AccessTokenInterface $tokenStorage = null, EncryptionInterface $encryptionUtil = null)
+    public function __construct(PublicKeyInterface $publicKeyStorage, AccessTokenInterface $tokenStorage = null, $config = array(), EncryptionInterface $encryptionUtil = null)
     {
         $this->publicKeyStorage = $publicKeyStorage;
         $this->tokenStorage = $tokenStorage;
+        $config = array_merge(array(
+            'allowed_algorithms' => 'all',
+        ), $config);
+
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt;
+            $encryptionUtil = new SpomkyLabsJwt($config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
     }

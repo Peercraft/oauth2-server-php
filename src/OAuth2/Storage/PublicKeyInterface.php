@@ -10,8 +10,8 @@ namespace OAuth2\Storage;
  */
 interface PublicKeyInterface
 {
-    public function getPublicKey($client_id = null, $where = null);
-    public function getPrivateKey($client_id = null, $where = null);
-    public function getPrivateKeyId($client_id = null, $where = null);
-    public function getEncryptionAlgorithm($client_id = null, $where = null);
+    public function getClientKeys($client_id = null, $where = null);
+    public function getPrivateSigningKeys($client_id = null, $where = null);
+    public function getPrivateDecryptionKeys($client_id = null, $where = null);
+    public function getEncryptionAlgorithms($client_id = null, $where = null);
 }

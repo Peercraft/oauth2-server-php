@@ -173,17 +173,17 @@ class Jwt implements EncryptionInterface
         return $signature;
     }
 
-    public function getSigningAlgorithms()
+    public function getSignatureAlgorithms()
     {
         return array('none', 'HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512');
     }
 
-    public function getEncryptionAlgorithms_alg()
+    public function getKeyEncryptionAlgorithms()
     {
         return array();
     }
 
-    public function getEncryptionAlgorithms_enc()
+    public function getContentEncryptionAlgorithms()
     {
         return array();
     }

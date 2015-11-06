@@ -7,7 +7,7 @@ use OAuth2\ResponseInterface;
 use OAuth2\TokenType\Bearer;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 use OAuth2\Storage\ClientInterface;
 
 /**
@@ -23,14 +23,16 @@ class DynRegController implements DynRegControllerInterface
 
     public function __construct($config, ClientInterface $clientStorage = NULL, EncryptionInterface $encryptionUtil = null)
     {
-        $this->config = $config;
+        $this->config = array_merge(array(
+            'allowed_algorithms' => 'all',
+        ), $config);
         $this->clientStorage = $clientStorage;
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt();
+            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
 
-        $signing_algorithms = $this->encryptionUtil->getSigningAlgorithms();
+        $signing_algorithms = $this->encryptionUtil->getSignatureAlgorithms();
         $signing_algorithms_without_none = array_values(array_diff($signing_algorithms, array('none')));
         if (!isset($this->config['id_token_signing_alg_values_supported'])) {
             $this->config['id_token_signing_alg_values_supported'] = $signing_algorithms;
@@ -45,7 +47,7 @@ class DynRegController implements DynRegControllerInterface
             $this->config['token_endpoint_auth_signing_alg_values_supported'] = $signing_algorithms_without_none;
         }
 
-        $encryption_algorithms_alg = $this->encryptionUtil->getEncryptionAlgorithms_alg();
+        $encryption_algorithms_alg = $this->encryptionUtil->getKeyEncryptionAlgorithms();
         if (!isset($this->config['id_token_encryption_alg_values_supported'])) {
             $this->config['id_token_encryption_alg_values_supported'] = $encryption_algorithms_alg;
         }
@@ -56,7 +58,7 @@ class DynRegController implements DynRegControllerInterface
             $this->config['request_object_encryption_alg_values_supported'] = $encryption_algorithms_alg;
         }
 
-        $encryption_algorithms_enc = $this->encryptionUtil->getEncryptionAlgorithms_enc();
+        $encryption_algorithms_enc = $this->encryptionUtil->getContentEncryptionAlgorithms();
         if (!isset($this->config['id_token_encryption_enc_values_supported'])) {
             $this->config['id_token_encryption_enc_values_supported'] = $encryption_algorithms_enc;
         }
@@ -261,6 +263,7 @@ class DynRegController implements DynRegControllerInterface
             $new_data[ 'application_type' ] = "web";
         }
 
+        $redirect_uri_hosts = array();
         if( !empty( $new_data[ 'redirect_uris' ] ) && is_array( $new_data[ 'redirect_uris' ] ) ) {
             $new_data[ 'redirect_uris' ] = array_unique( $new_data[ 'redirect_uris' ] );
             $known_url_schemes = [ 'http', 'https', 'mailto', 'ssh', 'gopher', 'irc', 'ftp' ];
@@ -273,6 +276,10 @@ class DynRegController implements DynRegControllerInterface
 
                 $urlparts = parse_url( $redirect_uri );
                 $urlparts = array_map( 'mb_strtolower', $urlparts );
+
+                if (!in_array($urlparts[ 'host' ], $redirect_uri_hosts)) {
+                    $redirect_uri_hosts[] = $urlparts[ 'host' ];
+                }
 
                 // if web client and have implicit grant type: require https and not use localhost
                 if( $new_data[ 'application_type' ] === "web" && in_array( 'implicit', $new_data[ 'grant_types' ] ) ) {
@@ -380,13 +387,10 @@ class DynRegController implements DynRegControllerInterface
             $new_data[ 'subject_type' ] = reset( $this->config[ 'subject_types_supported' ] );
         }
 
-        // TODO: TEMP: Disable because tests OP Cert test fails
-        /*
-        if( $new_data[ 'subject_type' ] == "pairwise" && empty( $new_data[ 'sector_identifier_uri' ] ) && count( $new_data[ 'redirect_uris' ] ) > 1 ) {
+        if( $new_data[ 'subject_type' ] == "pairwise" && empty( $new_data[ 'sector_identifier_uri' ] ) && count( $redirect_uri_hosts ) > 1 ) {
             $response->setError(400, 'invalid_client_metadata', "Multiple redirect_uris without sector_identifier_uri is not supported when subject_type is pairwise");
             return;
         }
-        */
 
         if( !empty( $new_data[ 'id_token_signed_response_alg' ] ) && is_string( $new_data[ 'id_token_signed_response_alg' ] ) ) {
             if( !in_array( $new_data[ 'id_token_signed_response_alg' ], $this->config['id_token_signing_alg_values_supported'] ) ) {

@@ -545,13 +545,13 @@ class Server implements ResourceControllerInterface,
             $this->responseTypes = $this->getDefaultResponseTypes();
         }
 
-        $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer')));
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer allowed_algorithms')));
 
         if ($this->config['use_openid_connect']) {
-            return new OpenIDAuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
+            return new OpenIDAuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil());
         }
 
-        return new AuthorizeController($this->storages['client'], $this->responseTypes, $config, $this->getScopeUtil());
+        return new AuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil());
     }
 
     protected function createDefaultTokenController()
@@ -622,7 +622,7 @@ class Server implements ResourceControllerInterface,
             $this->tokenType = $this->getDefaultTokenType();
         }
 
-        $config = array_intersect_key($this->config, array('www_realm' => ''));
+        $config = array_intersect_key($this->config, array('www_realm' => '', 'allowed_algorithms' => ''));
 
         return new UserInfoController($this->tokenType, $this->storages['access_token'], $this->storages['user_claims'], $config, $this->getScopeUtil(), $this->storages['public_key']);
     }
@@ -764,8 +764,11 @@ class Server implements ResourceControllerInterface,
         if (!empty($this->config['store_encrypted_token_string']) && isset($this->storages['access_token'])) {
             $tokenStorage = $this->storages['access_token'];
         }
+
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'allowed_algorithms')));
+
         // wrap the access token storage as required.
-        return new JwtAccessTokenStorage($this->storages['public_key'], $tokenStorage);
+        return new JwtAccessTokenStorage($this->storages['public_key'], $tokenStorage, $config);
     }
 
     /**
@@ -787,7 +790,7 @@ class Server implements ResourceControllerInterface,
             $refreshStorage = $this->storages['refresh_token'];
         }
 
-        $config = array_intersect_key($this->config, array_flip(explode(' ', 'store_encrypted_token_string issuer access_lifetime refresh_token_lifetime')));
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'store_encrypted_token_string issuer access_lifetime refresh_token_lifetime allowed_algorithms')));
 
         return new JwtAccessToken($this->storages['public_key'], $tokenStorage, $refreshStorage, $config);
     }
@@ -818,7 +821,7 @@ class Server implements ResourceControllerInterface,
             throw new \LogicException("You must supply a storage object implementing OAuth2\Storage\PublicKeyInterface to use openid connect");
         }
 
-        $config = array_intersect_key($this->config, array_flip(explode(' ', 'issuer id_lifetime')));
+        $config = array_intersect_key($this->config, array_flip(explode(' ', 'issuer id_lifetime allowed_algorithms')));
 
         return new IdToken($this->storages['user_claims'], $this->storages['public_key'], $config);
     }

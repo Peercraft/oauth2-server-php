@@ -3,7 +3,7 @@
 namespace OAuth2\OpenID\ResponseType;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 use OAuth2\Storage\PublicKeyInterface;
 use OAuth2\OpenID\Storage\UserClaimsInterface;
 
@@ -16,19 +16,20 @@ class IdToken implements IdTokenInterface
 
     public function __construct(UserClaimsInterface $userClaimsStorage, PublicKeyInterface $publicKeyStorage, array $config = array(), EncryptionInterface $encryptionUtil = null)
     {
+        $this->config = array_merge(array(
+            'allowed_algorithms' => 'all',
+            'id_lifetime' => 3600,
+        ), $config);
         $this->userClaimsStorage = $userClaimsStorage;
         $this->publicKeyStorage = $publicKeyStorage;
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt();
+            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
 
         if (!isset($config['issuer'])) {
             throw new \LogicException('config parameter "issuer" must be set');
         }
-        $this->config = array_merge(array(
-            'id_lifetime' => 3600,
-        ), $config);
     }
 
     public function getAuthorizeResponse($params, $userInfo = null, $access_token = null, $authorization_code = null)
@@ -83,24 +84,42 @@ class IdToken implements IdTokenInterface
         return $this->encodeToken($token, $client_id);
     }
 
-    protected function createAtHash($access_token, $client_id = null)
+    protected function createAtHash($access_token, $client_id)
     {
+        list($algorithm) = $this->publicKeyStorage->getEncryptionAlgorithms($client_id, 'id_token');
+
         // maps HS256 and RS256 to sha256, etc.
-        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'id_token');
-        $hash_algorithm = 'sha' . substr($algorithm, 2);
+        if (preg_match("/^[A-Z]{2,2}(224|256|384|512)$/", $algorithm)) {
+            $hash_algorithm = 'sha' . substr($algorithm, 2);
+        } else {
+            $hash_algorithm = 'sha256';
+        }
+
         $hash = hash($hash_algorithm, $access_token, true);
         $at_hash = substr($hash, 0, strlen($hash) / 2);
 
         return $this->encryptionUtil->urlSafeB64Encode($at_hash);
     }
 
-    protected function encodeToken(array $token, $client_id = null)
+    protected function encodeToken(array $claims, $client_id)
     {
-        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'id_token');
-        $algorithm = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'id_token');
-        $private_key_id = $this->publicKeyStorage->getPrivateKeyId($client_id, 'id_token');
+        list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($client_id, 'id_token');
 
-        return $this->encryptionUtil->encode($token, $private_key, $algorithm, $private_key_id);
+        if (empty($sig_alg) && empty($enc_alg)) {
+            return false;
+        }
+
+        if (!empty($sig_alg)) {
+            $private_keys = $this->publicKeyStorage->getPrivateSigningKeys($client_id, 'id_token');
+            $claims = $this->encryptionUtil->sign($private_keys, $claims, $sig_alg);
+        }
+
+        if (!empty($enc_alg)) {
+            $public_keys = $this->publicKeyStorage->getClientKeys($client_id, 'id_token');
+            $claims = $this->encryptionUtil->encrypt($public_keys, $claims, $enc_alg, $enc_enc);
+        }
+
+        return $claims;
     }
 
     protected function getUserIdAndAuthTime($userInfo)

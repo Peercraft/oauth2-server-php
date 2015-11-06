@@ -3,7 +3,7 @@
 namespace OAuth2\ResponseType;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\Jwt;
+use OAuth2\Encryption\SpomkyLabsJwt;
 use OAuth2\Storage\AccessTokenInterface as AccessTokenStorageInterface;
 use OAuth2\Storage\RefreshTokenInterface;
 use OAuth2\Storage\PublicKeyInterface;
@@ -29,16 +29,20 @@ class JwtAccessToken extends AccessToken
         $this->publicKeyStorage = $publicKeyStorage;
         $config = array_merge(array(
             'store_encrypted_token_string' => true,
-            'issuer' => ''
+            'allowed_algorithms' => 'all',
+            'issuer' => '',
         ), $config);
+
         if (is_null($tokenStorage)) {
             // a pass-thru, so we can call the parent constructor
             $tokenStorage = new Memory();
         }
+
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new Jwt();
+            $encryptionUtil = new SpomkyLabsJwt($config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
+
         parent::__construct($tokenStorage, $refreshStorage, $config);
     }
 
@@ -114,11 +118,19 @@ class JwtAccessToken extends AccessToken
         return $token;
     }
 
-    protected function encodeToken(array $token, $client_id = null)
+    protected function encodeToken(array $claims, $client_id)
     {
-        $private_key = $this->publicKeyStorage->getPrivateKey($client_id, 'jwtaccesstoken');
-        $algorithm   = $this->publicKeyStorage->getEncryptionAlgorithm($client_id, 'jwtaccesstoken');
+        list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($client_id, 'jwtaccesstoken');
 
-        return $this->encryptionUtil->encode($token, $private_key, $algorithm);
+        if (empty($sig_alg)) {
+            throw new \RuntimeException('No jwtaccesstoken signature alg set for client <'.$client_id.'>');
+        }
+
+        if (!empty($sig_alg)) {
+            $private_keys = $this->publicKeyStorage->getPrivateSigningKeys($client_id, 'jwtaccesstoken');
+            $claims = $this->encryptionUtil->sign($private_keys, $claims, $sig_alg);
+        }
+
+        return $claims;
     }
 }

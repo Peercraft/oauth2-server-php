@@ -95,13 +95,19 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         }
 
         if (!is_null($request_jwt)) {
-            $algorithm = $this->clientStorage->getEncryptionAlgorithm($this->getClientId(), 'request_object');
-            $key = $this->clientStorage->getClientKey($this->getClientId(), 'request_object');
+            list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($this->getClientId(), 'request_object');
 
-            if (!empty($algorithm)) {
-                $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key, array( $algorithm ) );
+            $private_keys = $this->publicKeyStorage->getPrivateDecryptionKeys($this->getClientId(), 'request_object');
+            $decrypted_jwt = $this->encryptionUtil->decrypt($private_keys, $request_jwt, null, null, $this->config['issuer']);
+            if (!empty($decrypted_jwt)) {
+                $request_jwt = $decrypted_jwt;
+            }
+
+            $public_keys = $this->publicKeyStorage->getClientKeys($this->getClientId(), 'request_object');
+            if (!empty($sig_alg)) {
+                $request_jwt_data = $this->encryptionUtil->verify($public_keys, $request_jwt, $sig_alg, $this->config['issuer']);
             } else {
-                $request_jwt_data = $this->encryptionUtil->decode( $request_jwt, $key );
+                $request_jwt_data = $this->encryptionUtil->verify($public_keys, $request_jwt, null, $this->config['issuer']);
             }
 
             if (empty($request_jwt_data)) {
