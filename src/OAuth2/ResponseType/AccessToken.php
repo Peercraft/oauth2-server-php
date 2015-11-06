@@ -16,8 +16,8 @@ class AccessToken implements AccessTokenInterface
     protected $config;
 
     /**
-     * @param OAuth2\Storage\AccessTokenInterface  $tokenStorage   REQUIRED Storage class for saving access token information
-     * @param OAuth2\Storage\RefreshTokenInterface $refreshStorage OPTIONAL Storage class for saving refresh token information
+     * @param AccessTokenInterface  $tokenStorage   REQUIRED Storage class for saving access token information
+     * @param RefreshTokenInterface $refreshStorage OPTIONAL Storage class for saving refresh token information
      * @param array                                $config         OPTIONAL Configuration options for the server
      *                                                             <code>
      *                                                             $config = array(

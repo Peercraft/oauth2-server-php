@@ -107,9 +107,9 @@ class Server implements ResourceControllerInterface,
      * @param array                                                   $grantTypes          An array of OAuth2\GrantType\GrantTypeInterface to use for granting access tokens
      * @param array                                                   $responseTypes       Response types to use.  array keys should be "code" and and "token" for
      *                                                                                     Access Token and Authorization Code response types
-     * @param OAuth2\TokenType\TokenTypeInterface                     $tokenType           The token type object to use. Valid token types are "bearer" and "mac"
-     * @param OAuth2\ScopeInterface                                   $scopeUtil           The scope utility class to use to validate scope
-     * @param OAuth2\ClientAssertionType\ClientAssertionTypeInterface $clientAssertionType The method in which to verify the client identity.  Default is HttpBasic
+     * @param TokenTypeInterface                     $tokenType           The token type object to use. Valid token types are "bearer" and "mac"
+     * @param ScopeInterface                                   $scopeUtil           The scope utility class to use to validate scope
+     * @param ClientAssertionTypeInterface $clientAssertionType The method in which to verify the client identity.  Default is HttpBasic
      *
      * @ingroup oauth2_section_7
      */
@@ -249,11 +249,8 @@ class Server implements ResourceControllerInterface,
      * Return claims about the authenticated end-user.
      * This would be called from the "/UserInfo" endpoint as defined in the spec.
      *
-     * @param $request - OAuth2\RequestInterface
-     * Request object to grant access token
-     *
-     * @param $response - OAuth2\ResponseInterface
-     * Response object containing error messages (failure) or user claims (success)
+     * @param RequestInterface $request Request object to grant access token
+     * @param ResponseInterface $response Response object containing error messages (failure) or user claims (success)
      *
      * @throws InvalidArgumentException
      * @throws LogicException
@@ -273,11 +270,8 @@ class Server implements ResourceControllerInterface,
      * This would be called from the "/token" endpoint as defined in the spec.
      * Obviously, you can call your endpoint whatever you want.
      *
-     * @param $request - OAuth2\RequestInterface
-     * Request object to grant access token
-     *
-     * @param $response - OAuth2\ResponseInterface
-     * Response object containing error messages (failure) or access token (success)
+     * @param RequestInterface $request Request object to grant access token
+     * @param ResponseInterface $response Response object containing error messages (failure) or access token (success)
      *
      * @throws InvalidArgumentException
      * @throws LogicException
@@ -329,7 +323,7 @@ class Server implements ResourceControllerInterface,
      * authorization server should call this function to redirect the user
      * appropriately.
      *
-     * @param $request
+     * @param RequestInterface $request
      * The request should have the follow parameters set in the querystring:
      * - response_type: The requested response: an access token, an
      * authorization code, or both.
@@ -341,10 +335,8 @@ class Server implements ResourceControllerInterface,
      * list of space-delimited strings.
      * - state: (optional) An opaque value used by the client to maintain
      * state between the request and callback.
-     * @param $is_authorized
-     * TRUE or FALSE depending on whether the user authorized the access.
-     * @param $user_id
-     * Identifier of user who authorized the client
+     * @param bool $is_authorized TRUE or FALSE depending on whether the user authorized the access.
+     * @param array|string $user_id Identifier of user who authorized the client
      *
      * @see http://tools.ietf.org/html/rfc6749#section-4
      *

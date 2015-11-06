@@ -19,7 +19,7 @@ class HttpBasic implements ClientAssertionTypeInterface
     protected $config;
 
     /**
-     * @param OAuth2\Storage\ClientCredentialsInterface $clientStorage REQUIRED Storage class for retrieving client credentials information
+     * @param ClientCredentialsInterface $clientStorage REQUIRED Instance of ClientCredentialsInterface to retrieve client credentials information
      * @param array                                     $config        OPTIONAL Configuration options for the server
      *                                                                 <code>
      *                                                                 $config = array(

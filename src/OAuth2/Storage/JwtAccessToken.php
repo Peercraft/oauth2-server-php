@@ -4,6 +4,8 @@ namespace OAuth2\Storage;
 
 use OAuth2\Encryption\EncryptionInterface;
 use OAuth2\Encryption\Jwt;
+use OAuth2\Storage\PublicKeyInterface;
+use OAuth2\Storage\JwtAccessTokenInterface;
 
 /**
  *
@@ -16,13 +18,13 @@ class JwtAccessToken implements JwtAccessTokenInterface
     protected $encryptionUtil;
 
     /**
-     * @param OAuth2\Encryption\PublicKeyInterface  $publicKeyStorage the public key encryption to use
-     * @param OAuth2\Storage\AccessTokenInterface   $tokenStorage     OPTIONAL persist the access token to another storage. This is useful if
+     * @param PublicKeyInterface  $publicKeyStorage the public key encryption to use
+     * @param JwtAccessTokenInterface   $tokenStorage     OPTIONAL persist the access token to another storage. This is useful if
      *                                                                you want to retain access token grant information somewhere, but
      *                                                                is not necessary when using this grant type.
-     * @param OAuth2\Encryption\EncryptionInterface $encryptionUtil   OPTIONAL class to use for "encode" and "decode" functions.
+     * @param EncryptionInterface $encryptionUtil   OPTIONAL class to use for "encode" and "decode" functions.
      */
-    public function __construct(PublicKeyInterface $publicKeyStorage, AccessTokenInterface $tokenStorage = null, $config = array(), EncryptionInterface $encryptionUtil = null)
+    public function __construct(PublicKeyInterface $publicKeyStorage, JwtAccessTokenInterface $tokenStorage = null, $config = array(), EncryptionInterface $encryptionUtil = null)
     {
         $this->publicKeyStorage = $publicKeyStorage;
         $this->tokenStorage = $tokenStorage;

@@ -30,7 +30,7 @@ class AuthorizeController implements AuthorizeControllerInterface
     protected $encryptionUtil;
 
     /**
-     * @param OAuth2\Storage\ClientInterface $clientStorage REQUIRED Instance of OAuth2\Storage\ClientInterface to retrieve client information
+     * @param ClientInterface $clientStorage REQUIRED Instance of OAuth2\Storage\ClientInterface to retrieve client information
      * @param array                          $responseTypes OPTIONAL Array of OAuth2\ResponseType\ResponseTypeInterface objects.  Valid array
      *                                                      keys are "code" and "token"
      * @param array                          $config        OPTIONAL Configuration options for the server
@@ -42,7 +42,7 @@ class AuthorizeController implements AuthorizeControllerInterface
      *                                                      'redirect_status_code' => 302,        // HTTP status code to use for redirect responses
      *                                                      );
      *                                                      </code>
-     * @param OAuth2\ScopeInterface          $scopeUtil     OPTIONAL Instance of OAuth2\ScopeInterface to validate the requested scope
+     * @param ScopeInterface          $scopeUtil     OPTIONAL Instance of OAuth2\ScopeInterface to validate the requested scope
      */
     public function __construct(ClientInterface $clientStorage, PublicKeyInterface $publicKeyStorage, array $responseTypes, array $config = array(), ScopeInterface $scopeUtil = null, EncryptionInterface $encryptionUtil = null)
     {

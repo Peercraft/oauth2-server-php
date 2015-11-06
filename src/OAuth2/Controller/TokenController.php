@@ -60,8 +60,7 @@ class TokenController implements TokenControllerInterface
      * This would be called from the "/token" endpoint as defined in the spec.
      * You can call your endpoint whatever you want.
      *
-     * @param $request - RequestInterface
-     * Request object to grant access token
+     * @param RequestInterface $request Request object to grant access token
      *
      * @throws InvalidArgumentException
      * @throws LogicException
@@ -204,10 +203,8 @@ class TokenController implements TokenControllerInterface
     /**
      * addGrantType
      *
-     * @param grantType - OAuth2\GrantTypeInterface
-     * the grant type to add for the specified identifier
-     * @param identifier - string
-     * a string passed in as "grant_type" in the response that will call this grantType
+     * @param GrantTypeInterface $grantType The grant type to add for the specified identifier
+     * @param string $identifier A string passed in as "grant_type" in the response that will call this grantType
      */
     public function addGrantType(GrantTypeInterface $grantType, $identifier = null)
     {

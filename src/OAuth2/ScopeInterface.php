@@ -14,8 +14,8 @@ interface ScopeInterface extends ScopeStorageInterface
     /**
      * Check if everything in required scope is contained in available scope.
      *
-     * @param $required_scope
-     * A space-separated string of scopes.
+     * @param string $required_scope A space-separated string of required scopes.
+     * @param string $available_scope A space-separated string of available scopes.
      *
      * @return
      * TRUE if everything in required scope is contained in available scope,
@@ -30,8 +30,7 @@ interface ScopeInterface extends ScopeStorageInterface
     /**
      * Return scope info from request
      *
-     * @param OAuth2\RequestInterface
-     * Request object to check
+     * @param RequestInterface $request Request object to check
      *
      * @return
      * string representation of requested scope
