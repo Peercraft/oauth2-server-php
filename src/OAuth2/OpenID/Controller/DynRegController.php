@@ -7,7 +7,7 @@ use OAuth2\ResponseInterface;
 use OAuth2\TokenType\Bearer;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\SpomkyLabsJwt;
+use OAuth2\Encryption\Jwt;
 use OAuth2\Storage\ClientInterface;
 
 /**
@@ -28,7 +28,7 @@ class DynRegController implements DynRegControllerInterface
         ), $config);
         $this->clientStorage = $clientStorage;
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
+            $encryptionUtil = new Jwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
 

@@ -2,21 +2,73 @@
 
 namespace OAuth2\Encryption;
 
+use phpseclib\Crypt\RSA;
+use phpseclib\Math\BigInteger;
+
 /**
  * @link https://github.com/F21/jwt
  * @author F21
  */
 class Jwt implements EncryptionInterface
 {
+    protected $algorithms;
+
     protected $kty_algo = array(
         'none' => array('none'),
-        'RS' => array('RS256', 'RS384', 'RS512'),
-        'HS' => array('HS256', 'HS384', 'HS512'),
+        'RSA' => array('RS256', 'RS384', 'RS512'),
+        'oct' => array('HS256', 'HS384', 'HS512'),
     );
 
-    public function encode($payload, $key, $algo = 'HS256', $keyId = null)
+    public function __construct( $algorithms )
     {
-        $header = $this->generateJwtHeader($payload, $algo, $keyId);
+        if ($algorithms==='all') {
+            $algorithms = array(
+                'none',
+                'HS256', 'HS384', 'HS512',
+                'RS256', 'RS384', 'RS512',
+                );
+        }
+        $this->algorithms = $algorithms;
+    }
+
+    public function sign($keys, $payload, $alg)
+    {
+        if (empty($keys)) {
+            throw new \InvalidArgumentException('No keys provided');
+        }
+
+        $selected_key = null;
+        foreach ($keys as $key) {
+            // Undefined key type or key type not supported
+            if (!isset($key['kty']) || !array_key_exists($key['kty'], $this->kty_algo)) {
+                continue;
+            }
+
+            // Is the wanted algorithm supported by this key
+            if (!in_array($alg, $this->kty_algo[$key['kty']])) {
+                continue;
+            }
+
+            // Is this key allowed to use for signatures
+            if (isset($key['use']) && $key['use'] !== 'sig') {
+                continue;
+            }
+
+            // Is this key allowed to use for signing
+            if (isset($key['key_ops']) && is_array($key['key_ops']) && !in_array('sign', $key['key_ops'])) {
+                continue;
+            }
+
+            $selected_key = $key;
+            break;
+        }
+
+        if (is_null($selected_key)) {
+            throw new \InvalidArgumentException('No keys available for alg '.$alg.'.');
+        }
+
+        $kid = isset($selected_key['kid']) ? $selected_key['kid'] : null;
+        $header = $this->generateJwtHeader($payload, $alg, $kid);
 
         $segments = array(
             $this->urlSafeB64Encode(json_encode($header)),
@@ -25,88 +77,118 @@ class Jwt implements EncryptionInterface
 
         $signing_input = implode('.', $segments);
 
-        $signature = $this->sign($signing_input, $key, $algo);
-        $segments[] = $this->urlsafeB64Encode($signature);
+        $signature = $this->generateSignature($signing_input, $selected_key, $alg);
+        $segments[] = $this->urlSafeB64Encode($signature);
 
         return implode('.', $segments);
     }
 
-    public function decode($jwt, $key = null, $allowedAlgorithms = true)
+    public function encrypt($keys, $payload, $alg, $enc)
     {
-        if (!strpos($jwt, '.')) {
-            return false;
-        }
-
-        $tks = explode('.', $jwt);
-
-        if (count($tks) != 3) {
-            return false;
-        }
-
-        list($headb64, $payloadb64, $cryptob64) = $tks;
-
-        if (null === ($header = json_decode($this->urlSafeB64Decode($headb64), true))) {
-            return false;
-        }
-
-        if (null === $payload = json_decode($this->urlSafeB64Decode($payloadb64), true)) {
-            return false;
-        }
-
-        $sig = $this->urlSafeB64Decode($cryptob64);
-
-        if ((bool) $allowedAlgorithms) {
-            if (!isset($header['alg'])) {
-                return false;
-            }
-
-            // check if bool arg supplied here to maintain BC
-            if (is_array($allowedAlgorithms) && !in_array($header['alg'], $allowedAlgorithms)) {
-                return false;
-            }
-
-            if (!$this->verifySignature($sig, "$headb64.$payloadb64", $key, $header['alg'])) {
-                return false;
-            }
-        }
-
-        return $payload;
+        throw new \InvalidArgumentException(__CLASS__." does not support encryption");
     }
 
-    public function secureDecode($jwt, array $keys, array $allowedAlgorithms = array())
+    public function verify($keys, $jwtdata, $alg, $audience = null)
     {
-        $payload = false;
-        foreach($keys as $key) {
-            if (!isset($key['type'])) {
-                throw new \InvalidArgumentException("Key must have an type param");
+        if (empty($keys)) {
+            throw new \InvalidArgumentException('No keys provided');
+        }
+
+        $parts = explode('.', $jwtdata);
+        if (count($parts)!==3) {
+            return false;
+        }
+
+        $header = json_decode($this->urlSafeB64Decode($parts[0]), true);
+        if (empty($header)) {
+            return false;
+        }
+
+        // Is this an JWE (and therefor not JWS)
+        if (array_key_exists('enc', $header)) {
+            return false;
+        }
+
+        if (isset($header['alg'])) {
+            if ($header['alg'] !== $alg) {
+                return false;
             }
-            if (!isset($key['key'])) {
-                throw new \InvalidArgumentException("Key must have an key param");
-            }
-            if (!isset($this->kty_algo[$key['type']])) {
-                throw new \InvalidArgumentException("Key type not supported");
+        } else {
+            if (is_null($alg)) {
+                return false;
             }
 
-            if (!empty($allowedAlgorithms)) {
-                $key_allowed_algorithms = array_intersect($allowedAlgorithms, $this->kty_algo[$key['type']]);
-            } else {
-                $key_allowed_algorithms = $this->kty_algo[$key['type']];
-            }
+            $header['alg'] = $alg;
+        }
 
-            if (empty($key_allowed_algorithms)) {
+        $payload = json_decode($this->urlSafeB64Decode($parts[1]), true);
+        if (empty($payload)) {
+            return false;
+        }
+
+        if (!is_null($audience)) {
+            if (isset($header['aud']) && $header['aud'] !== $audience) {
+                return false;
+            }
+            if (isset($payload['aud']) && $payload['aud'] !== $audience) {
+                return false;
+            }
+        }
+
+        $signature = $this->urlSafeB64Decode($parts[2]);
+
+        foreach ($keys as $key) {
+            // Undefined key type or key type not supported
+            if (!isset($key['kty']) || !array_key_exists($key['kty'], $this->kty_algo)) {
                 continue;
             }
 
-            $payload = $this->decode($jwt, $key['key'], $key_allowed_algorithms);
-            if ($payload !== false) {
-                break;
+            // Is the wanted algorithm supported by this key
+            if (!in_array($header['alg'], $this->kty_algo[$key['kty']])) {
+                continue;
+            }
+
+            // Is this key allowed to use for signatures
+            if (isset($key['use']) && $key['use'] !== 'sig') {
+                continue;
+            }
+
+            // Is this key allowed to use for verification
+            if (isset($key['key_ops']) && is_array($key['key_ops']) && !in_array('verify', $key['key_ops'])) {
+                continue;
+            }
+
+            if ($this->verifySignature($signature, $parts[0].".".$parts[1], $key, $header['alg'])) {
+                return $payload;
             }
         }
 
-        return $payload;
+        throw new \RuntimeException('JWT could not be verified by the available keys.');
     }
 
-    private function verifySignature($signature, $input, $key, $algo = 'HS256')
+    public function decrypt($keys, $jwtdata, $alg, $enc, $audience = null)
+    {
+        return false;
+    }
+
+    public function unsafeDecode($jwtdata, $decryption_keys = null)
+    {
+        $parts = explode('.', $jwtdata);
+        if (count($parts)!==3) {
+            return false;
+        }
+
+        $header = json_decode($this->urlSafeB64Decode($parts[0]), true);
+        if (array_key_exists('enc', $header)) {
+            return $header;
+        }
+
+        $payload = json_decode($this->urlSafeB64Decode($parts[1]), true);
+
+        return array_merge($payload, $header);
+    }
+
+    private function verifySignature($signature, $input, $key, $algo)
     {
         // use constants when possible, for HipHop support
         switch ($algo) {
@@ -122,60 +204,87 @@ class Jwt implements EncryptionInterface
                 );
 
             case 'RS256':
-                return @openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA256') ? OPENSSL_ALGO_SHA256 : 'sha256') === 1;
-
             case 'RS384':
-                return @openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA384') ? OPENSSL_ALGO_SHA384 : 'sha384') === 1;
-
             case 'RS512':
-                return @openssl_verify($input, $signature, $key, defined('OPENSSL_ALGO_SHA512') ? OPENSSL_ALGO_SHA512 : 'sha512') === 1;
+                $rsa = new RSA();
+                $rsa->modulus = new BigInteger($this->urlSafeB64Decode($key['n']), 256);
+                $rsa->publicExponent = new BigInteger($this->urlSafeB64Decode($key['e']), 256);
+
+                $rsa->k = strlen($rsa->modulus->toBytes());
+                $rsa->exponent = $rsa->publicExponent;
+
+                $rsa->setHash('sha'.substr($algo, 2));
+                $rsa->setSignatureMode(RSA::SIGNATURE_PKCS1);
+
+                return @$rsa->verify($input, $signature);
 
             default:
                 throw new \InvalidArgumentException("Unsupported or invalid signing algorithm.");
         }
     }
 
-    private function sign($input, $key, $algo = 'HS256')
+    private function generateSignature($input, $key, $algo)
     {
         switch ($algo) {
             case 'none':
                 return "";
 
             case 'HS256':
-                return hash_hmac('sha256', $input, $key, true);
+                return hash_hmac('sha256', $input, $this->urlSafeB64Decode($key['k']), true);
 
             case 'HS384':
-                return hash_hmac('sha384', $input, $key, true);
+                return hash_hmac('sha384', $input, $this->urlSafeB64Decode($key['k']), true);
 
             case 'HS512':
-                return hash_hmac('sha512', $input, $key, true);
+                return hash_hmac('sha512', $input, $this->urlSafeB64Decode($key['k']), true);
 
             case 'RS256':
-                return $this->generateRSASignature($input, $key, defined('OPENSSL_ALGO_SHA256') ? OPENSSL_ALGO_SHA256 : 'sha256');
-
             case 'RS384':
-                return $this->generateRSASignature($input, $key, defined('OPENSSL_ALGO_SHA384') ? OPENSSL_ALGO_SHA384 : 'sha384');
-
             case 'RS512':
-                return $this->generateRSASignature($input, $key, defined('OPENSSL_ALGO_SHA512') ? OPENSSL_ALGO_SHA512 : 'sha512');
+                if (!isset($key['dp'])) {
+                    $key['dp'] = $this->urlSafeB64Encode(0);
+                }
+                if (!isset($key['dq'])) {
+                    $key['dq'] = $this->urlSafeB64Encode(0);
+                }
+                if (!isset($key['qi'])) {
+                    $key['qi'] = $this->urlSafeB64Encode(0);
+                }
 
+                $rsa = new RSA();
+                $rsa->modulus = new BigInteger($this->urlSafeB64Decode($key['n']), 256);
+                $rsa->publicExponent = new BigInteger($this->urlSafeB64Decode($key['e']), 256);
+                $rsa->privateExponent = new BigInteger($this->urlSafeB64Decode($key['d']), 256);
+                $rsa->primes = array(1 => new BigInteger($this->urlSafeB64Decode($key['p']), 256));
+                $rsa->primes[] = new BigInteger($this->urlSafeB64Decode($key['q']), 256);
+                $rsa->exponents = array(1 => new BigInteger($this->urlSafeB64Decode($key['dp']), 256));
+                $rsa->exponents[] = new BigInteger($this->urlSafeB64Decode($key['dq']), 256);
+                $rsa->coefficients = array(2 => new BigInteger($this->urlSafeB64Decode($key['qi']), 256));
+
+                $rsa->k = strlen($rsa->modulus->toBytes());
+                $rsa->exponent = $rsa->privateExponent;
+
+                $rsa->setHash('sha'.substr($algo, 2));
+                $rsa->setSignatureMode(RSA::SIGNATURE_PKCS1);
+
+                $signature = @$rsa->sign($input);
+                if (!$signature) {
+                    throw new \Exception("Signature generation failed");
+                }
+
+                return $signature;
             default:
                 throw new \Exception("Unsupported or invalid signing algorithm.");
         }
     }
 
-    private function generateRSASignature($input, $key, $algo)
-    {
-        if (!openssl_sign($input, $signature, $key, $algo)) {
-            throw new \Exception("Unable to sign data.");
-        }
-
-        return $signature;
-    }
-
     public function getSignatureAlgorithms()
     {
-        return array('none', 'HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512');
+        return array_values(array_intersect($this->algorithms, array(
+            'none',
+            'HS256', 'HS384', 'HS512',
+            'RS256', 'RS384', 'RS512',
+            )));
     }
 
     public function getKeyEncryptionAlgorithms()
@@ -210,15 +319,15 @@ class Jwt implements EncryptionInterface
     /**
      * Override to create a custom header
      */
-    protected function generateJwtHeader($payload, $algorithm, $keyId = null)
+    protected function generateJwtHeader($payload, $alg, $kid = null)
     {
         $header = array(
             'typ' => 'JWT',
-            'alg' => $algorithm,
+            'alg' => $alg,
         );
 
-        if (!is_null($keyId)) {
-            $header['kid'] = $keyId;
+        if (!is_null($kid)) {
+            $header['kid'] = $kid;
         }
 
         return $header;

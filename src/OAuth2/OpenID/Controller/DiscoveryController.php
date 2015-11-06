@@ -6,7 +6,7 @@ use OAuth2\RequestInterface;
 use OAuth2\ResponseInterface;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\SpomkyLabsJwt;
+use OAuth2\Encryption\Jwt;
 
 /**
  * @see OAuth2\Controller\DiscoveryControllerInterface
@@ -23,7 +23,7 @@ class DiscoveryController implements DiscoveryControllerInterface
 
         $this->storages = $storages;
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
+            $encryptionUtil = new Jwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
 

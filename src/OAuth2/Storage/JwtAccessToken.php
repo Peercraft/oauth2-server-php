@@ -3,7 +3,7 @@
 namespace OAuth2\Storage;
 
 use OAuth2\Encryption\EncryptionInterface;
-use OAuth2\Encryption\SpomkyLabsJwt;
+use OAuth2\Encryption\Jwt;
 
 /**
  *
@@ -31,7 +31,7 @@ class JwtAccessToken implements JwtAccessTokenInterface
         ), $config);
 
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new SpomkyLabsJwt($config['allowed_algorithms']);
+            $encryptionUtil = new Jwt($config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
     }

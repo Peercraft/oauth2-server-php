@@ -22,7 +22,8 @@
         "predis/predis": "Required to use the Redis storage engine",
         "thobbs/phpcassa": "Required to use the Cassandra storage engine",
         "aws/aws-sdk-php": "~2.8 is required to use the DynamoDB storage engine",
-        "firebase/php-jwt": "~2.2 is required to use JWT features",
-        "spomky-labs/jose-service": "~0.1 is required to use JWT features"
+        "phpseclib/phpseclib": "~2.0 is required to use JWT features",
+        "firebase/php-jwt": "Alternative JWT lib (~2.2 is needed)",
+        "spomky-labs/jose-service": "Alternative JWT lib which support encryption (~0.1 is needed)"
     }
 }

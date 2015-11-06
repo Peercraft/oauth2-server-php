@@ -5,7 +5,7 @@ namespace OAuth2\GrantType;
 use OAuth2\ClientAssertionType\ClientAssertionTypeInterface;
 use OAuth2\Storage\JwtBearerInterface;
 use OAuth2\Storage\PublicKeyInterface;
-use OAuth2\Encryption\SpomkyLabsJwt;
+use OAuth2\Encryption\Jwt;
 use OAuth2\Encryption\EncryptionInterface;
 use OAuth2\ResponseType\AccessTokenInterface;
 use OAuth2\RequestInterface;
@@ -47,7 +47,7 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
         ), $config);
 
         if (is_null($encryptionUtil)) {
-            $encryptionUtil = new SpomkyLabsJwt($this->config['allowed_algorithms']);
+            $encryptionUtil = new Jwt($this->config['allowed_algorithms']);
         }
         $this->encryptionUtil = $encryptionUtil;
     }
@@ -108,7 +108,7 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
             if (!empty($decrypted_jwt)) {
                 $assertion = $decrypted_jwt;
             }
-        } catch( \RuntimeArgumentException $e ) {
+        } catch( \RuntimeException $e ) {
             $response->setError(400, 'invalid_grant', "JWT failed decryption");
 
             return null;
@@ -127,7 +127,7 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
             } else {
                 $jwt = $this->encryptionUtil->verify($public_keys, $assertion, null, $this->audience);
             }
-        } catch( \RuntimeArgumentException $e ) {
+        } catch( \RuntimeException $e ) {
             $response->setError(400, 'invalid_grant', "JWT failed signature verification");
 
             return null;

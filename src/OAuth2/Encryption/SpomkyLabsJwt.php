@@ -154,7 +154,7 @@ class SpomkyLabsJwt implements EncryptionInterface
         }
 
         if (!$jose->verify($jwt, $key_set)) {
-            throw new \RuntimeArgumentException('JWT could not be verified by the available keys.');
+            throw new \RuntimeException('JWT could not be verified by the available keys.');
         }
 
         return $jwt->getPayload();
@@ -190,7 +190,7 @@ class SpomkyLabsJwt implements EncryptionInterface
         }
 
         if (!$jose->decrypt($jwt, $jose->getKeysetManager()->getPrivateKeySet())) {
-            throw new \RuntimeArgumentException('JWT could not be decrypted by the available keys.');
+            throw new \RuntimeException('JWT could not be decrypted by the available keys.');
         }
 
         return $jwt->getPayload();
@@ -206,12 +206,12 @@ class SpomkyLabsJwt implements EncryptionInterface
         $jose->getConfiguration()->set('checker.nbf', false);
         $jose->getConfiguration()->set('checker.crit', false);
 
-        $data = array();
-
         $jwt = $jose->load($jwtdata);
         if ($jwt instanceof JWEInterface) {
+            $jwe_header = $jwt->getHeader();
+
             if (empty($decryption_keys)) {
-                return false;
+                return $jwe_header;
             }
 
             $i = 0;
@@ -221,22 +221,19 @@ class SpomkyLabsJwt implements EncryptionInterface
             }
 
             if (!$jose->decrypt($jwt, $jose->getKeysetManager()->getPrivateKeySet())) {
-                return false;
+                return $jwe_header;
             }
 
-            $data = array_merge($data, $jwt->getHeader());
-
             $jwt = $jose->load($jwt->getPayload());
+        } else {
+            $jwe_header = array();
         }
 
         if (!$jwt instanceof JWSInterface) {
             return false;
         }
 
-        $data = array_merge($data, $jwt->getHeader());
-        $data = array_merge($data, $jwt->getPayload());
-
-        return $data;
+        return array_merge($jwt->getPayload(), $jwt->getHeader(), $jwe_header);
     }
 
     public function getSignatureAlgorithms()

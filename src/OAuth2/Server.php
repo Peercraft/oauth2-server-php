@@ -38,6 +38,8 @@ use OAuth2\GrantType\RefreshToken;
 use OAuth2\GrantType\AuthorizationCode;
 use OAuth2\Storage\JwtAccessToken as JwtAccessTokenStorage;
 use OAuth2\Storage\JwtAccessTokenInterface;
+use OAuth2\Encryption\EncryptionInterface;
+use OAuth2\Encryption\Jwt;
 
 /**
 * Server class for OAuth2
@@ -73,6 +75,7 @@ class Server implements ResourceControllerInterface,
     protected $tokenType;
     protected $scopeUtil;
     protected $clientAssertionType;
+    protected $encryptionUtil;
 
     protected $storageMap = array(
         'access_token' => 'OAuth2\Storage\AccessTokenInterface',
@@ -110,7 +113,7 @@ class Server implements ResourceControllerInterface,
      *
      * @ingroup oauth2_section_7
      */
-    public function __construct($storage = array(), array $config = array(), array $grantTypes = array(), array $responseTypes = array(), TokenTypeInterface $tokenType = null, ScopeInterface $scopeUtil = null, ClientAssertionTypeInterface $clientAssertionType = null)
+    public function __construct($storage = array(), array $config = array(), array $grantTypes = array(), array $responseTypes = array(), TokenTypeInterface $tokenType = null, ScopeInterface $scopeUtil = null, ClientAssertionTypeInterface $clientAssertionType = null, EncryptionInterface $encryptionUtil = null)
     {
         $storage = is_array($storage) ? $storage : array($storage);
         $this->storages = array();
@@ -135,6 +138,7 @@ class Server implements ResourceControllerInterface,
             'allow_public_clients'     => true,
             'always_issue_new_refresh_token' => false,
             'unset_refresh_token_after_use' => true,
+            'allowed_algorithms' => 'all',
         ), $config);
 
         foreach ($grantTypes as $key => $grantType) {
@@ -148,6 +152,7 @@ class Server implements ResourceControllerInterface,
         $this->tokenType = $tokenType;
         $this->scopeUtil = $scopeUtil;
         $this->clientAssertionType = $clientAssertionType;
+        $this->encryptionUtil = $encryptionUtil;
 
         if ($this->config['use_openid_connect']) {
             $this->validateOpenIdConnect();
@@ -528,6 +533,15 @@ class Server implements ResourceControllerInterface,
         return $this->scopeUtil;
     }
 
+    public function getEncryptionUtil()
+    {
+        if (!$this->encryptionUtil) {
+            $this->encryptionUtil = new Jwt($this->config['allowed_algorithms']);
+        }
+
+        return $this->encryptionUtil;
+    }
+
     /**
      * every getter deserves a setter
      */
@@ -548,10 +562,10 @@ class Server implements ResourceControllerInterface,
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_implicit enforce_state require_exact_redirect_uri request_parameter_supported request_uri_parameter_supported require_request_uri_registration issuer allowed_algorithms')));
 
         if ($this->config['use_openid_connect']) {
-            return new OpenIDAuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil());
+            return new OpenIDAuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil(), $this->getEncryptionUtil());
         }
 
-        return new AuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil());
+        return new AuthorizeController($this->storages['client'], $this->storages['public_key'], $this->responseTypes, $config, $this->getScopeUtil(), $this->getEncryptionUtil());
     }
 
     protected function createDefaultTokenController()
@@ -624,7 +638,7 @@ class Server implements ResourceControllerInterface,
 
         $config = array_intersect_key($this->config, array('www_realm' => '', 'allowed_algorithms' => ''));
 
-        return new UserInfoController($this->tokenType, $this->storages['access_token'], $this->storages['user_claims'], $config, $this->getScopeUtil(), $this->storages['public_key']);
+        return new UserInfoController($this->tokenType, $this->storages['access_token'], $this->storages['user_claims'], $config, $this->getScopeUtil(), $this->storages['public_key'], $this->getEncryptionUtil());
     }
 
     protected function createDefaultDiscoveryController()
@@ -634,12 +648,12 @@ class Server implements ResourceControllerInterface,
             $this->config['response_types_supported'] = array_keys($this->responseTypes);
         }
 
-        return new DiscoveryController($this->config, $this->storages);
+        return new DiscoveryController($this->config, $this->storages, $this->getEncryptionUtil());
     }
 
     protected function createDefaultDynRegController()
     {
-        return new DynRegController($this->config, $this->storages['client']);
+        return new DynRegController($this->config, $this->storages['client'], $this->getEncryptionUtil());
     }
 
     protected function getDefaultTokenType()
@@ -768,7 +782,7 @@ class Server implements ResourceControllerInterface,
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'allowed_algorithms')));
 
         // wrap the access token storage as required.
-        return new JwtAccessTokenStorage($this->storages['public_key'], $tokenStorage, $config);
+        return new JwtAccessTokenStorage($this->storages['public_key'], $tokenStorage, $config, $this->getEncryptionUtil());
     }
 
     /**
@@ -792,7 +806,7 @@ class Server implements ResourceControllerInterface,
 
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'store_encrypted_token_string issuer access_lifetime refresh_token_lifetime allowed_algorithms')));
 
-        return new JwtAccessToken($this->storages['public_key'], $tokenStorage, $refreshStorage, $config);
+        return new JwtAccessToken($this->storages['public_key'], $tokenStorage, $refreshStorage, $config, $this->getEncryptionUtil());
     }
 
     protected function createDefaultAccessTokenResponseType()
@@ -823,7 +837,7 @@ class Server implements ResourceControllerInterface,
 
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'issuer id_lifetime allowed_algorithms')));
 
-        return new IdToken($this->storages['user_claims'], $this->storages['public_key'], $config);
+        return new IdToken($this->storages['user_claims'], $this->storages['public_key'], $config, $this->getEncryptionUtil());
     }
 
     protected function createDefaultIdTokenTokenResponseType()
