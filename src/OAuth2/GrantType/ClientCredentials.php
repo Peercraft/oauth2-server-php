@@ -3,8 +3,11 @@
 namespace OAuth2\GrantType;
 
 use OAuth2\ClientAssertionType\HttpBasic;
+use OAuth2\Encryption\EncryptionInterface;
 use OAuth2\ResponseType\AccessTokenInterface;
 use OAuth2\Storage\ClientCredentialsInterface;
+use OAuth2\Storage\JwtBearerInterface;
+use OAuth2\Storage\PublicKeyInterface;
 
 /**
  * @author Brent Shaffer <bshafs at gmail dot com>
@@ -15,7 +18,7 @@ class ClientCredentials extends HttpBasic implements GrantTypeInterface
 {
     private $clientData;
 
-    public function __construct(ClientCredentialsInterface $storage, array $config = array())
+    public function __construct(ClientCredentialsInterface $storage, PublicKeyInterface $publicKeyStorage, JwtBearerInterface $jtiStorage, array $config = array(), EncryptionInterface $encryptionUtil = null)
     {
         /**
          * The client credentials grant type MUST only be used by confidential clients
@@ -24,7 +27,7 @@ class ClientCredentials extends HttpBasic implements GrantTypeInterface
          */
         $config['allow_public_clients'] = false;
 
-        parent::__construct($storage, $config);
+        parent::__construct($storage, $publicKeyStorage, $jtiStorage, $config, $encryptionUtil);
     }
 
     public function getQuerystringIdentifier()
@@ -55,7 +58,7 @@ class ClientCredentials extends HttpBasic implements GrantTypeInterface
          */
         $includeRefreshToken = false;
 
-        return $accessToken->createAccessToken($client_id, $user_id, $scope, $includeRefreshToken);
+        return $accessToken->saveAccessToken($accessToken->generateAccessToken(), $client_id, $user_id, $scope, $includeRefreshToken);
     }
 
     private function loadClientData()

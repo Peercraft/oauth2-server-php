@@ -12,7 +12,7 @@ use OAuth2\ResponseInterface;
 class AuthorizeController extends BaseAuthorizeController implements AuthorizeControllerInterface
 {
     private $nonce;
-    private $requestObject;
+    private $requestObject = array();
 
     protected function setNotAuthorizedResponse(RequestInterface $request, ResponseInterface $response, $redirect_uri, $user_id = null)
     {
@@ -33,15 +33,10 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $this->getState(), $error, $error_message);
     }
 
-    protected function buildAuthorizeParameters($request, $response, $user_id)
+    protected function buildAuthorizeParameters($request, $response, $userInfo)
     {
-        if (!$params = parent::buildAuthorizeParameters($request, $response, $user_id)) {
+        if (!$params = parent::buildAuthorizeParameters($request, $response, $userInfo)) {
             return;
-        }
-
-        // Generate an id token if needed.
-        if ($this->needsIdToken($this->getScope()) && $this->getResponseType() == 'code') {
-            $params['id_token'] = $this->responseTypes['id_token']->createIdToken($this->getClientId(), $user_id, $this->nonce);
         }
 
         // add the nonce to return with the redirect URI
@@ -53,6 +48,17 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
     public function validateAuthorizeRequest(RequestInterface $request, ResponseInterface $response)
     {
         if (!parent::validateAuthorizeRequest($request, $response)) {
+            return false;
+        }
+
+        // if response_type is not code send error as fragment
+        if ($this->getResponseType() !== 'code') {
+            $response->setErrorAsFragment(true);
+        }
+
+        // Check if requested reponsetype asks for id_token without openid scope
+        if (in_array($this->getResponseType(), array('id_token', 'id_token token', 'code id_token', 'code id_token token')) && !$this->scopeUtil->checkScope('openid', $this->getScope())) {
+            $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_scope', 'Responsetypes containing id_token requires openid scope');
             return false;
         }
 
@@ -125,11 +131,6 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
                 return false;
             }
 
-            if (isset($request_jwt_data['scope']) && !$this->needsIdToken($this->getScope())) {
-                $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_request_object', 'when having scope in request object it is requred to have openid scope in oauth');
-                return false;
-            }
-
             if (isset($request_jwt_data['iss']) && $request_jwt_data['iss'] !== $this->getClientId()) {
                 $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_request_object', 'when having iss in request object it must match client_id');
                 return false;
@@ -149,8 +150,8 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
         }
 
         // Validate required nonce for "id_token" and "id_token token"
-        if (!$nonce && in_array($this->getResponseType(), array('id_token', 'id_token token'))) {
-            $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_nonce', 'This application requires you specify a nonce parameter');
+        if (!$nonce && in_array($this->getResponseType(), array('id_token', 'id_token token', 'code id_token', 'code token', 'code id_token token'))) {
+            $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_request', 'Nonce parameter is required for implicit and hybrid flows');
             return false;
         }
 
@@ -169,7 +170,7 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             ) );
         if( $ret !== true )
         {
-            throw new Exception( "make_request cURL setup failed" );
+            throw new \Exception( "make_request cURL setup failed" );
         }
 
         $response = curl_exec( $ch );
@@ -184,13 +185,13 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
                 ) );
             if( $ret !== true )
             {
-                throw new Exception( "second make_request cURL setup failed" );
+                throw new \Exception( "second make_request cURL setup failed" );
             }
 
             $response = curl_exec( $ch );
             if( $response === false )
             {
-                throw new Exception( "make_request cURL request failed, #" . curl_errno( $ch ) . ": " . curl_error( $ch ) . "" );
+                throw new \Exception( "make_request cURL request failed, #" . curl_errno( $ch ) . ": " . curl_error( $ch ) . "" );
             }
         }
 
@@ -198,29 +199,10 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
 
         if( empty( $response ) )
         {
-            throw new Exception( "make_request empty responce received" );
+            throw new \Exception( "make_request empty responce received" );
         }
 
         return $response;
-    }
-
-    /**
-     * Returns whether the current request needs to generate an id token.
-     *
-     * ID Tokens are a part of the OpenID Connect specification, so this
-     * method checks whether OpenID Connect is enabled in the server settings
-     * and whether the openid scope was requested.
-     *
-     * @param $request_scope
-     *  A space-separated string of scopes.
-     *
-     * @return
-     *   TRUE if an id token is needed, FALSE otherwise.
-     */
-    public function needsIdToken($request_scope)
-    {
-        // see if the "openid" scope exists in the requested scope
-        return $this->scopeUtil->checkScope('openid', $request_scope);
     }
 
     public function getNonce()

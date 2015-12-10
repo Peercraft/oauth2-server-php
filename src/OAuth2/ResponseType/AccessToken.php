@@ -52,7 +52,9 @@ class AccessToken implements AccessTokenInterface
          * @see http://tools.ietf.org/html/rfc6749#section-4.2.2
          */
         $includeRefreshToken = false;
-        $result["fragment"] = $this->createAccessToken($params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
+
+        $access_token = $this->generateAccessToken();
+        $result["fragment"] = $this->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
 
         if (isset($params['state'])) {
             $result["fragment"]["state"] = $params['state'];
@@ -72,18 +74,18 @@ class AccessToken implements AccessTokenInterface
      * @see http://tools.ietf.org/html/rfc6749#section-5
      * @ingroup oauth2_section_5
      */
-    public function createAccessToken($client_id, $userInfo, $scope = null, $includeRefreshToken = true)
+    public function saveAccessToken($access_token, $client_id, $userInfo, $scope = null, $includeRefreshToken = true, $authorization_code = null)
     {
         $token = array(
-            "access_token" => $this->generateAccessToken(),
+            "access_token" => $access_token,
             "expires_in" => $this->config['access_lifetime'],
             "token_type" => $this->config['token_type'],
             "scope" => $scope
         );
 
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
+        $user_id = is_array($userInfo) ? $userInfo['user_id'] : $userInfo;
 
-        $this->tokenStorage->setAccessToken($token["access_token"], $client_id, $user_id, $this->config['access_lifetime'] ? time() + $this->config['access_lifetime'] : null, $scope);
+        $this->tokenStorage->setAccessToken($token["access_token"], $client_id, $user_id, $this->config['access_lifetime'] ? time() + $this->config['access_lifetime'] : null, $scope, $authorization_code);
 
         /*
          * Issue a refresh token also, if we support them
@@ -97,7 +99,7 @@ class AccessToken implements AccessTokenInterface
             if ($this->config['refresh_token_lifetime'] > 0) {
                 $expires = time() + $this->config['refresh_token_lifetime'];
             }
-            $this->refreshStorage->setRefreshToken($token['refresh_token'], $client_id, $user_id, $expires, $scope);
+            $this->refreshStorage->setRefreshToken($token['refresh_token'], $client_id, $user_id, $expires, $scope, $authorization_code);
         }
 
         return $token;
@@ -114,7 +116,7 @@ class AccessToken implements AccessTokenInterface
      *
      * @ingroup oauth2_section_4
      */
-    protected function generateAccessToken()
+    public function generateAccessToken()
     {
         if (function_exists('mcrypt_create_iv')) {
             $randomData = mcrypt_create_iv(20, MCRYPT_DEV_URANDOM);
@@ -185,29 +187,5 @@ class AccessToken implements AccessTokenInterface
         }
 
         return $revoked;
-    }
-
-    protected function getUserIdAndAuthTime($userInfo)
-    {
-        $auth_time = null;
-
-        // support an array for user_id / auth_time
-        if (is_array($userInfo)) {
-            if (!isset($userInfo['user_id'])) {
-                throw new \LogicException('if $user_id argument is an array, user_id index must be set');
-            }
-
-            $auth_time = isset($userInfo['auth_time']) ? $userInfo['auth_time'] : null;
-            $user_id = $userInfo['user_id'];
-        } else {
-            $user_id = $userInfo;
-        }
-
-        if (is_null($auth_time)) {
-            $auth_time = time();
-        }
-
-        // userInfo is a scalar, and so this is the $user_id. Auth Time is null
-        return array($user_id, $auth_time);
     }
 }

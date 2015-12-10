@@ -93,7 +93,7 @@ class RefreshToken implements GrantTypeInterface
          */
         $issueNewRefreshToken = $this->config['always_issue_new_refresh_token'];
         $unsetRefreshToken = $this->config['unset_refresh_token_after_use'];
-        $token = $accessToken->createAccessToken($client_id, $user_id, $scope, $issueNewRefreshToken);
+        $token = $accessToken->saveAccessToken($accessToken->generateAccessToken(), $client_id, $user_id, $scope, $issueNewRefreshToken, $this->refreshToken['authorization_code']);
 
         if ($unsetRefreshToken) {
             $this->storage->unsetRefreshToken($this->refreshToken['refresh_token']);

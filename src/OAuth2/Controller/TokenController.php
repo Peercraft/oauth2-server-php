@@ -135,10 +135,17 @@ class TokenController implements TokenControllerInterface
             }
         }
 
+        if (!$clientData = $this->clientStorage->getClientDetails($clientId)) {
+            $response->setError(400, 'invalid_client', 'The client id supplied is invalid');
+
+            return false;
+        }
+
         /**
          * Validate the client can use the requested grant type
          */
-        if (!$this->clientStorage->checkRestrictedGrantType($clientId, $grantTypeIdentifier)) {
+        $grant_types = isset($clientData['grant_types']) ? $clientData['grant_types'] : array();
+        if (!empty($grant_types) && !in_array($grantTypeIdentifier, $grant_types)) {
             $response->setError(400, 'unauthorized_client', 'The grant type is unauthorized for this client_id');
 
             return false;
@@ -157,6 +164,7 @@ class TokenController implements TokenControllerInterface
 
         $requestedScope = $this->scopeUtil->getScopeFromRequest($request);
         $availableScope = $grantType->getScope();
+        $clientScope = isset($clientData['scope']) ? $clientData['scope'] : null;
 
         if ($requestedScope) {
             // validate the requested scope
@@ -168,7 +176,7 @@ class TokenController implements TokenControllerInterface
                 }
             } else {
                 // validate the client has access to this scope
-                if ($clientScope = $this->clientStorage->getClientScope($clientId)) {
+                if ($clientScope) {
                     if (!$this->scopeUtil->checkScope($requestedScope, $clientScope)) {
                         $response->setError(400, 'invalid_scope', 'The scope requested is invalid for this client');
 

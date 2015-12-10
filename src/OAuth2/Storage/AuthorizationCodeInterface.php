@@ -53,13 +53,13 @@ interface AuthorizationCodeInterface
      * @param string $code         Authorization code to be stored.
      * @param mixed  $client_id    Client identifier to be stored.
      * @param mixed  $user_id      User identifier to be stored.
-     * @param string $redirect_uri Redirect URI(s) to be stored in a space-separated string.
      * @param int    $expires      Expiration to be stored as a Unix timestamp.
-     * @param string $scope        OPTIONAL Scopes to be stored in space-separated string.
+     * @param mixed  $params       All original params needed for ResponseType request
+     * @param mixed  $userInfo     All user info from authorize request
      *
      * @ingroup oauth2_section_4
      */
-    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null);
+    public function setAuthorizationCode($code, $client_id, $user_id, $expires, $params = null, $userInfo = null);
 
     /**
      * once an Authorization Code is used, it must be exipired
@@ -74,4 +74,18 @@ interface AuthorizationCodeInterface
      *
      */
     public function expireAuthorizationCode($code);
+
+    /**
+     * multiple use of a code SHOULD revoke all previously issued tokens
+     *
+     * @see http://tools.ietf.org/html/rfc6749#section-4.1.2
+     *
+     *    The client MUST NOT use the authorization code
+     *    more than once.  If an authorization code is used more than
+     *    once, the authorization server MUST deny the request and SHOULD
+     *    revoke (when possible) all tokens previously issued based on
+     *    that authorization code
+     *
+     */
+    public function invalidateTokensFromAuthorizationCode($code);
 }

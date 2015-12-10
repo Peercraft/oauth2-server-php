@@ -44,7 +44,7 @@ interface AccessTokenInterface
      *
      * @ingroup oauth2_section_4
      */
-    public function setAccessToken($oauth_token, $client_id, $user_id, $expires, $scope = null);
+    public function setAccessToken($oauth_token, $client_id, $user_id, $expires, $scope = null, $authorization_code = null);
 
     /**
      * Expire an access token.

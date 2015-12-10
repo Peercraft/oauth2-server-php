@@ -34,5 +34,5 @@ interface UserClaimsInterface
      *
      * @see http://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
      */
-    public function getUserClaims($user_id, $scope, $client_id);
+    public function getUserClaims($user_id, $scope, $client_id, $where);
 }

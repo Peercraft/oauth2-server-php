@@ -2,8 +2,6 @@
 
 namespace OAuth2\Storage;
 
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
-
 /**
  * redis storage for all storage types
  *
@@ -21,8 +19,7 @@ class Redis implements AuthorizationCodeInterface,
     UserCredentialsInterface,
     RefreshTokenInterface,
     JwtBearerInterface,
-    ScopeInterface,
-    OpenIDAuthorizationCodeInterface
+    ScopeInterface
 {
 
     private $cache;
@@ -95,11 +92,11 @@ class Redis implements AuthorizationCodeInterface,
         return $this->getValue($this->config['code_key'] . $code);
     }
 
-    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null)
     {
         return $this->setValue(
             $this->config['code_key'] . $authorization_code,
-            compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope', 'id_token'),
+            compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope'),
             $expires
         );
     }
@@ -177,32 +174,6 @@ class Redis implements AuthorizationCodeInterface,
             $this->config['client_key'] . $client_id,
             compact('client_id', 'client_secret', 'redirect_uri', 'grant_types', 'scope', 'user_id')
         );
-    }
-
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, (array) $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
     }
 
     public function getClientKey($client_id, $subject)

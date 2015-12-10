@@ -78,6 +78,6 @@ class UserCredentials implements GrantTypeInterface
 
     public function createAccessToken(AccessTokenInterface $accessToken, $client_id, $user_id, $scope)
     {
-        return $accessToken->createAccessToken($client_id, $user_id, $scope);
+        return $accessToken->saveAccessToken($accessToken->generateAccessToken(), $client_id, $user_id, $scope);
     }
 }

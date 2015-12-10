@@ -5,7 +5,7 @@ namespace OAuth2\Storage;
 use Aws\DynamoDb\DynamoDbClient;
 
 use OAuth2\OpenID\Storage\UserClaimsInterface;
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
+
 /**
  * DynamoDB storage for all storage types
  *
@@ -40,8 +40,7 @@ class DynamoDB implements
     JwtBearerInterface,
     ScopeInterface,
     PublicKeyInterface,
-    UserClaimsInterface,
-    OpenIDAuthorizationCodeInterface
+    UserClaimsInterface
 {
     protected $client;
     protected $config;
@@ -134,32 +133,6 @@ class DynamoDB implements
         return true;
     }
 
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, (array) $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getClientKey($client_id, $subject)
     {
         $result = $this->client->getItem(array(
@@ -230,21 +203,18 @@ class DynamoDB implements
             return false ;
         }
         $token = $this->dynamo2array($result);
-        if (!array_key_exists("id_token", $token )) {
-            $token['id_token'] = null;
-        }
         $token['expires'] = strtotime($token['expires']);
 
         return $token;
 
     }
 
-    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null)
     {
         // convert expires to datestring
         $expires = date('Y-m-d H:i:s', $expires);
 
-        $clientData = compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'id_token', 'scope');
+        $clientData = compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope');
         $clientData = array_filter($clientData, 'self::isNotEmpty');
 
         $result = $this->client->putItem(array(

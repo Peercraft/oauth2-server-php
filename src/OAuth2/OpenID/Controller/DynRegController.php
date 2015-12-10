@@ -70,11 +70,11 @@ class DynRegController implements DynRegControllerInterface
         }
 
         if (!isset($this->config['token_endpoint_auth_methods_supported'])) {
-            $this->config['token_endpoint_auth_methods_supported'] = array('client_secret_post', 'client_secret_basic');
+            $this->config['token_endpoint_auth_methods_supported'] = array('client_secret_post', 'client_secret_basic', 'client_secret_jwt', 'private_key_jwt');
         }
     }
 
-    protected function validateClient() {
+    protected function validateClient($client_id, RequestInterface $request, ResponseInterface $response) {
         $bearer = new Bearer();
         $access_token = $bearer->getAccessTokenParameter( $request, $response );
 
@@ -100,7 +100,7 @@ class DynRegController implements DynRegControllerInterface
     {
         $client_id = $request->query('client_id', $request->request('client_id'));
 
-        if ($client_id && !$clientData = $this->validateClient($request, $response)) {
+        if ($client_id && !$clientData = $this->validateClient($client_id, $request, $response)) {
             return;
         }
 
@@ -113,8 +113,9 @@ class DynRegController implements DynRegControllerInterface
             if ($client_id) {
                 $this->clientStorage->updateClient( $client_id, $new_client_data, $new_client_meta );
             } else {
-                header( $_SERVER['SERVER_PROTOCOL'].' 201 Created', true, 201 );
                 $client_id = $this->clientStorage->addClient( $new_client_data, $new_client_meta );
+
+                $response->setStatusCode(201);
             }
 
             // fetch new clientdata, because it have been updated above
@@ -162,11 +163,15 @@ class DynRegController implements DynRegControllerInterface
             'request_uris',
             );
         foreach( $clientData as $key => $value ) {
-            if (!$value) {
+            if ($value === '') {
                 continue;
             }
 
-            if (!preg_match("/^" . preg_quote($key, "/") . "(#|$)/", $key)) {
+            $matches = array();
+            if (!preg_match("/^(" . preg_quote($key, "/") . ")(#|$)/", $key, $matches)) {
+                continue;
+            }
+            if (!in_array($matches[1], $valid_entries, true)) {
                 continue;
             }
 
@@ -199,16 +204,6 @@ class DynRegController implements DynRegControllerInterface
             $new_meta[ $key_parts[ 0 ] ][ $key_parts[ 1 ] ] = $value;
 
             unset( $new_data[ $key ] );
-        }
-
-        // Check if non-meta key exist, and otherwise add it using the first meta value
-        foreach( $new_meta as $field => &$langs ) {
-            if( isset( $new_data[ $field ] ) ) {
-                continue;
-            }
-
-            $value = array_shift( $langs );
-            $new_data[ $field ] = $value;
         }
 
         if( !empty( $new_data[ 'response_types' ] ) && is_array( $new_data[ 'response_types' ] ) ) {
@@ -270,7 +265,7 @@ class DynRegController implements DynRegControllerInterface
             foreach( $new_data[ 'redirect_uris' ] as $redirect_uri ) {
                 // check if uris syntax valid
                 if( !filter_var( $redirect_uri, FILTER_VALIDATE_URL ) ) {
-                    $response->setError(400, 'invalid_client_metadata', "The redirect_uri '" . $redirect_uri . "' is invalid");
+                    $response->setError(400, 'invalid_redirect_uri', "The redirect_uri '" . $redirect_uri . "' is invalid");
                     return;
                 }
 
@@ -281,15 +276,20 @@ class DynRegController implements DynRegControllerInterface
                     $redirect_uri_hosts[] = $urlparts[ 'host' ];
                 }
 
+                if (!empty($urlparts['fragment'])) {
+                    $response->setError(400, 'invalid_redirect_uri', "The redirect_uri '" . $redirect_uri . "' must not contain a fragment");
+                    return;
+                }
+
                 // if web client and have implicit grant type: require https and not use localhost
                 if( $new_data[ 'application_type' ] === "web" && in_array( 'implicit', $new_data[ 'grant_types' ] ) ) {
                     if( $urlparts[ 'scheme' ] !== "https" ) {
-                        $response->setError(400, 'invalid_client_metadata', "The redirect_uri '" . $redirect_uri . "' must be HTTPS (when application_type is web and have implicit grant type)");
+                        $response->setError(400, 'invalid_redirect_uri', "The redirect_uri '" . $redirect_uri . "' must be HTTPS (when application_type is web and have implicit grant type)");
                         return;
                     }
 
                     if( $urlparts[ 'host' ] === "localhost" ) {
-                        $response->setError(400, 'invalid_client_metadata', "The redirect_uri '" . $redirect_uri . "' must not be localhost (when application_type is web and have implicit grant type)");
+                        $response->setError(400, 'invalid_redirect_uri', "The redirect_uri '" . $redirect_uri . "' must not be localhost (when application_type is web and have implicit grant type)");
                         return;
                     }
                 }
@@ -301,7 +301,7 @@ class DynRegController implements DynRegControllerInterface
                     } elseif( $urlparts[ 'host' ] === "localhost" ) {
                         // continue
                     } else {
-                        $response->setError(400, 'invalid_client_metadata', "The redirect_uri '" . $redirect_uri . "' must be localhost or have custom scheme (when application_type native)");
+                        $response->setError(400, 'invalid_redirect_uri', "The redirect_uri '" . $redirect_uri . "' must be localhost or have custom scheme (when application_type native)");
                         return;
                     }
                 }

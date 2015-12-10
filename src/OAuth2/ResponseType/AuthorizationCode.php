@@ -27,9 +27,9 @@ class AuthorizationCode implements AuthorizationCodeInterface
         // build the URL to redirect to
         $result = array('query' => array());
 
-        $params += array('scope' => null, 'state' => null);
-
-        $result['query']['code'] = $this->createAuthorizationCode($params['client_id'], $userInfo, $params['redirect_uri'], $params['scope']);
+        $code = $this->generateAuthorizationCode();
+        $this->saveAuthorizationCode($code, $params, $userInfo);
+        $result['query']['code'] = $code;
 
         if (isset($params['state'])) {
             $result['query']['state'] = $params['state'];
@@ -54,14 +54,10 @@ class AuthorizationCode implements AuthorizationCodeInterface
      * @see http://tools.ietf.org/html/rfc6749#section-4
      * @ingroup oauth2_section_4
      */
-    public function createAuthorizationCode($client_id, $userInfo, $redirect_uri, $scope = null)
+    public function saveAuthorizationCode($code, $params = null, $userInfo = null)
     {
-        $code = $this->generateAuthorizationCode();
-
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
-        $this->storage->setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, time() + $this->config['auth_code_lifetime'], $scope);
-
-        return $code;
+        $user_id = is_array($userInfo) ? $userInfo['user_id'] : $userInfo;
+        $this->storage->setAuthorizationCode($code, $params['client_id'], $user_id, time() + $this->config['auth_code_lifetime'], $params, $userInfo);
     }
 
     /**
@@ -84,7 +80,7 @@ class AuthorizationCode implements AuthorizationCodeInterface
      *
      * @ingroup oauth2_section_4
      */
-    protected function generateAuthorizationCode()
+    public function generateAuthorizationCode()
     {
         $tokenLen = 40;
         if (function_exists('mcrypt_create_iv')) {
@@ -98,29 +94,5 @@ class AuthorizationCode implements AuthorizationCodeInterface
         }
 
         return substr(hash('sha512', $randomData), 0, $tokenLen);
-    }
-
-    protected function getUserIdAndAuthTime($userInfo)
-    {
-        $auth_time = null;
-
-        // support an array for user_id / auth_time
-        if (is_array($userInfo)) {
-            if (!isset($userInfo['user_id'])) {
-                throw new \LogicException('if $user_id argument is an array, user_id index must be set');
-            }
-
-            $auth_time = isset($userInfo['auth_time']) ? $userInfo['auth_time'] : null;
-            $user_id = $userInfo['user_id'];
-        } else {
-            $user_id = $userInfo;
-        }
-
-        if (is_null($auth_time)) {
-            $auth_time = time();
-        }
-
-        // userInfo is a scalar, and so this is the $user_id. Auth Time is null
-        return array($user_id, $auth_time);
     }
 }

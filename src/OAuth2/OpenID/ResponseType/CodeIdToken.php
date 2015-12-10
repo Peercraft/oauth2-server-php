@@ -2,6 +2,8 @@
 
 namespace OAuth2\OpenID\ResponseType;
 
+use OAuth2\ResponseType\AuthorizationCodeInterface;
+
 class CodeIdToken implements CodeIdTokenInterface
 {
     protected $authCode;
@@ -13,15 +15,23 @@ class CodeIdToken implements CodeIdTokenInterface
         $this->idToken = $idToken;
     }
 
-    public function getAuthorizeResponse($params, $user_id = null)
+    public function getAuthorizeResponse($params, $userInfo = null)
     {
-        $result = $this->authCode->getAuthorizeResponse($params, $user_id);
-        $authorization_code = $result[1]['query']['code'];
-        $result2 = $this->idToken->getAuthorizeResponse($params, $user_id, null, $authorization_code);
+        // build the URL to redirect to
+        $result = array('query' => array(), 'fragment' => array());
 
-        // Merge Code query into IdToken fragment
-        $result2[1]['fragment'] = array_merge($result2[1]['fragment'], $result[1]['query']);
+        $code = $this->authCode->generateAuthorizationCode();
+        $this->authCode->saveAuthorizationCode($code, $params, $userInfo);
+        $result["fragment"]["code"] = $code;
 
-        return $result2;
+        $params['authorization_code'] = $code;
+        $id_token = $this->idToken->createIdToken($params, $userInfo);
+        $result["fragment"]["id_token"] = $id_token;
+
+        if (isset($params['state'])) {
+            $result["fragment"]["state"] = $params['state'];
+        }
+
+        return array($params['redirect_uri'], $result);
     }
 }

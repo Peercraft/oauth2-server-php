@@ -3,7 +3,6 @@
 namespace OAuth2\Storage;
 
 use OAuth2\OpenID\Storage\UserClaimsInterface;
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
 
 /**
  * Simple PDO storage for all storage types
@@ -26,8 +25,7 @@ class Pdo implements
     JwtBearerInterface,
     ScopeInterface,
     PublicKeyInterface,
-    UserClaimsInterface,
-    OpenIDAuthorizationCodeInterface
+    UserClaimsInterface
 {
     protected $db;
     protected $config;
@@ -99,45 +97,27 @@ class Pdo implements
         $stmt = $this->db->prepare(sprintf('SELECT * from %s where client_id = :client_id', $this->config['client_table']));
         $stmt->execute(compact('client_id'));
 
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
+        if ($result = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $result['redirect_uris'] = explode(' ', $result['redirect_uris']);
+            $result['grant_types'] = explode(' ', $result['grant_types']);
+        }
+
+        return $result;
     }
 
-    public function setClientDetails($client_id, $client_secret = null, $redirect_uri = null, $grant_types = null, $scope = null, $user_id = null)
+    public function setClientDetails($client_id, $client_secret = null, $redirect_uris = null, $grant_types = null, $scope = null, $user_id = null)
     {
+        $redirect_uris = implode(' ', $redirect_uris);
+        $grant_types = implode(' ', $grant_types);
+
         // if it exists, update it.
         if ($this->getClientDetails($client_id)) {
-            $stmt = $this->db->prepare($sql = sprintf('UPDATE %s SET client_secret=:client_secret, redirect_uri=:redirect_uri, grant_types=:grant_types, scope=:scope, user_id=:user_id where client_id=:client_id', $this->config['client_table']));
+            $stmt = $this->db->prepare($sql = sprintf('UPDATE %s SET client_secret=:client_secret, redirect_uris=:redirect_uris, grant_types=:grant_types, scope=:scope, user_id=:user_id where client_id=:client_id', $this->config['client_table']));
         } else {
-            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (client_id, client_secret, redirect_uri, grant_types, scope, user_id) VALUES (:client_id, :client_secret, :redirect_uri, :grant_types, :scope, :user_id)', $this->config['client_table']));
+            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (client_id, client_secret, redirect_uris, grant_types, scope, user_id) VALUES (:client_id, :client_secret, :redirect_uris, :grant_types, :scope, :user_id)', $this->config['client_table']));
         }
 
-        return $stmt->execute(compact('client_id', 'client_secret', 'redirect_uri', 'grant_types', 'scope', 'user_id'));
-    }
-
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, (array) $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
+        return $stmt->execute(compact('client_id', 'client_secret', 'redirect_uris', 'grant_types', 'scope', 'user_id'));
     }
 
     public function getClientKey($client_id, $subject)
@@ -163,19 +143,19 @@ class Pdo implements
         return $token;
     }
 
-    public function setAccessToken($access_token, $client_id, $user_id, $expires, $scope = null)
+    public function setAccessToken($access_token, $client_id, $user_id, $expires, $scope = null, $authorization_code = null)
     {
         // convert expires to datestring
         $expires = date('Y-m-d H:i:s', $expires);
 
         // if it exists, update it.
         if ($this->getAccessToken($access_token)) {
-            $stmt = $this->db->prepare(sprintf('UPDATE %s SET client_id=:client_id, expires=:expires, user_id=:user_id, scope=:scope where access_token=:access_token', $this->config['access_token_table']));
+            $stmt = $this->db->prepare(sprintf('UPDATE %s SET client_id=:client_id, expires=:expires, user_id=:user_id, scope=:scope, authorization_code=:authorization_code where access_token=:access_token', $this->config['access_token_table']));
         } else {
-            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (access_token, client_id, expires, user_id, scope) VALUES (:access_token, :client_id, :expires, :user_id, :scope)', $this->config['access_token_table']));
+            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (access_token, client_id, expires, user_id, scope, authorization_code) VALUES (:access_token, :client_id, :expires, :user_id, :scope, :authorization_code)', $this->config['access_token_table']));
         }
 
-        return $stmt->execute(compact('access_token', 'client_id', 'user_id', 'expires', 'scope'));
+        return $stmt->execute(compact('access_token', 'client_id', 'user_id', 'expires', 'scope', 'authorization_code'));
     }
 
     public function unsetAccessToken($access_token)
@@ -194,44 +174,32 @@ class Pdo implements
         if ($code = $stmt->fetch(\PDO::FETCH_ASSOC)) {
             // convert date string back to timestamp
             $code['expires'] = strtotime($code['expires']);
+
+            // convert params and userInfo back into arrays
+            $code['params'] = unserialize($code['params']);
+            $code['userInfo'] = unserialize($code['userInfo']);
         }
 
         return $code;
     }
 
-    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
-    {
-        if (func_num_args() > 6) {
-            // we are calling with an id token
-            return call_user_func_array(array($this, 'setAuthorizationCodeWithIdToken'), func_get_args());
-        }
-
-        // convert expires to datestring
-        $expires = date('Y-m-d H:i:s', $expires);
-
-        // if it exists, update it.
-        if ($this->getAuthorizationCode($code)) {
-            $stmt = $this->db->prepare($sql = sprintf('UPDATE %s SET client_id=:client_id, user_id=:user_id, redirect_uri=:redirect_uri, expires=:expires, scope=:scope where authorization_code=:code', $this->config['code_table']));
-        } else {
-            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope) VALUES (:code, :client_id, :user_id, :redirect_uri, :expires, :scope)', $this->config['code_table']));
-        }
-
-        return $stmt->execute(compact('code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope'));
-    }
-
-    private function setAuthorizationCodeWithIdToken($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($code, $client_id, $user_id, $expires, $params = null, $userInfo = null)
     {
         // convert expires to datestring
         $expires = date('Y-m-d H:i:s', $expires);
 
+        // serialize params and userInfo arrays
+        $params = serialize( $params );
+        $userInfo = serialize( $userInfo );
+
         // if it exists, update it.
         if ($this->getAuthorizationCode($code)) {
-            $stmt = $this->db->prepare($sql = sprintf('UPDATE %s SET client_id=:client_id, user_id=:user_id, redirect_uri=:redirect_uri, expires=:expires, scope=:scope, id_token =:id_token where authorization_code=:code', $this->config['code_table']));
+            $stmt = $this->db->prepare($sql = sprintf('UPDATE %s SET client_id=:client_id, user_id=:user_id, expires=:expires, params=:params, userInfo=:userInfo where authorization_code=:code', $this->config['code_table']));
         } else {
-            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (authorization_code, client_id, user_id, redirect_uri, expires, scope, id_token) VALUES (:code, :client_id, :user_id, :redirect_uri, :expires, :scope, :id_token)', $this->config['code_table']));
+            $stmt = $this->db->prepare(sprintf('INSERT INTO %s (authorization_code, client_id, user_id, expires, params, userInfo) VALUES (:code, :client_id, :user_id, :expires, :params, :userInfo)', $this->config['code_table']));
         }
 
-        return $stmt->execute(compact('code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope', 'id_token'));
+        return $stmt->execute(compact('code', 'client_id', 'user_id', 'expires', 'params', 'userInfo'));
     }
 
     public function expireAuthorizationCode($code)
@@ -239,6 +207,13 @@ class Pdo implements
         $stmt = $this->db->prepare(sprintf('DELETE FROM %s WHERE authorization_code = :code', $this->config['code_table']));
 
         return $stmt->execute(compact('code'));
+    }
+
+    public function invalidateTokensFromAuthorizationCode($code)
+    {
+        $stmt = $this->db->prepare(sprintf('DELETE FROM %s WHERE authorization_code = :code', $this->config['access_token_table']));
+        $stmt2 = $this->db->prepare(sprintf('DELETE FROM %s WHERE authorization_code = :code', $this->config['refresh_token_table']));
+        return $stmt->execute(compact('code')) && $stmt2->execute(compact('code'));
     }
 
     /* OAuth2\Storage\UserCredentialsInterface */
@@ -309,14 +284,14 @@ class Pdo implements
         return $token;
     }
 
-    public function setRefreshToken($refresh_token, $client_id, $user_id, $expires, $scope = null)
+    public function setRefreshToken($refresh_token, $client_id, $user_id, $expires, $scope = null, $authorization_code = null)
     {
         // convert expires to datestring
         $expires = date('Y-m-d H:i:s', $expires);
 
-        $stmt = $this->db->prepare(sprintf('INSERT INTO %s (refresh_token, client_id, user_id, expires, scope) VALUES (:refresh_token, :client_id, :user_id, :expires, :scope)', $this->config['refresh_token_table']));
+        $stmt = $this->db->prepare(sprintf('INSERT INTO %s (refresh_token, client_id, user_id, expires, scope, authorization_code) VALUES (:refresh_token, :client_id, :user_id, :expires, :scope, :authorization_code)', $this->config['refresh_token_table']));
 
-        return $stmt->execute(compact('refresh_token', 'client_id', 'user_id', 'expires', 'scope'));
+        return $stmt->execute(compact('refresh_token', 'client_id', 'user_id', 'expires', 'scope', 'authorization_code'));
     }
 
     public function unsetRefreshToken($refresh_token)
@@ -469,8 +444,8 @@ class Pdo implements
         CREATE TABLE {$this->config['client_table']} (
           client_id             VARCHAR(80)   NOT NULL,
           client_secret         VARCHAR(80),
-          redirect_uri          VARCHAR(2000),
-          grant_types           VARCHAR(80),
+          redirect_uris         VARCHAR(2000),
+          grant_types           VARCHAR(500),
           scope                 VARCHAR(4000),
           user_id               VARCHAR(80),
           PRIMARY KEY (client_id)
@@ -478,31 +453,34 @@ class Pdo implements
 
         CREATE TABLE {$this->config['access_token_table']} (
           access_token         VARCHAR(40)    NOT NULL,
+          authorization_code   VARCHAR(40)    NOT NULL,
           client_id            VARCHAR(80)    NOT NULL,
           user_id              VARCHAR(80),
           expires              TIMESTAMP      NOT NULL,
           scope                VARCHAR(4000),
-          PRIMARY KEY (access_token)
+          PRIMARY KEY (access_token),
+          INDEX(`authorization_code`)
         );
 
         CREATE TABLE {$this->config['code_table']} (
           authorization_code  VARCHAR(40)    NOT NULL,
           client_id           VARCHAR(80)    NOT NULL,
           user_id             VARCHAR(80),
-          redirect_uri        VARCHAR(2000),
           expires             TIMESTAMP      NOT NULL,
-          scope               VARCHAR(4000),
-          id_token            VARCHAR(1000),
+          params              VARCHAR(4000),
+          userInfo            VARCHAR(4000),
           PRIMARY KEY (authorization_code)
         );
 
         CREATE TABLE {$this->config['refresh_token_table']} (
           refresh_token       VARCHAR(40)    NOT NULL,
+          authorization_code  VARCHAR(40)    NOT NULL,
           client_id           VARCHAR(80)    NOT NULL,
           user_id             VARCHAR(80),
           expires             TIMESTAMP      NOT NULL,
           scope               VARCHAR(4000),
-          PRIMARY KEY (refresh_token)
+          PRIMARY KEY (refresh_token),
+          INDEX(`authorization_code`)
         );
 
         CREATE TABLE {$this->config['user_table']} (
@@ -530,7 +508,7 @@ class Pdo implements
         CREATE TABLE {$this->config['jti_table']} (
           issuer              VARCHAR(80)   NOT NULL,
           subject             VARCHAR(80),
-          audiance            VARCHAR(80),
+          audience            VARCHAR(80),
           expires             TIMESTAMP     NOT NULL,
           jti                 VARCHAR(2000) NOT NULL
         );

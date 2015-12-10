@@ -76,7 +76,7 @@ class DiscoveryController implements DiscoveryControllerInterface
         }
 
         if (!isset($this->config['token_endpoint_auth_methods_supported'])) {
-            $this->config['token_endpoint_auth_methods_supported'] = array('client_secret_post', 'client_secret_basic');
+            $this->config['token_endpoint_auth_methods_supported'] = array('client_secret_post', 'client_secret_basic', 'client_secret_jwt', 'private_key_jwt');
         }
     }
 

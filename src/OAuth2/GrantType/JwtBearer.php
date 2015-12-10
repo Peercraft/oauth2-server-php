@@ -104,7 +104,7 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
 
         $private_keys = $this->publicKeyStorage->getPrivateDecryptionKeys($unsafe_jwt['iss'], 'jwtbearer');
         try {
-            $decrypted_jwt = $this->encryptionUtil->decrypt($private_keys, $assertion, null, null, $this->config['issuer']);
+            $decrypted_jwt = $this->encryptionUtil->decrypt($private_keys, $assertion, null, null, $this->audience);
             if (!empty($decrypted_jwt)) {
                 $assertion = $decrypted_jwt;
             }
@@ -204,6 +204,6 @@ class JwtBearer implements GrantTypeInterface, ClientAssertionTypeInterface
     {
         $includeRefreshToken = false;
 
-        return $accessToken->createAccessToken($client_id, $user_id, $scope, $includeRefreshToken);
+        return $accessToken->saveAccessToken($accessToken->generateAccessToken(), $client_id, $user_id, $scope, $includeRefreshToken);
     }
 }

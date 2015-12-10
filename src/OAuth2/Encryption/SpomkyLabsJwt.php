@@ -61,20 +61,20 @@ class SpomkyLabsJwt implements EncryptionInterface
         $jose = new Jose();
         $jose->getConfiguration()->set('algorithms', $this->algorithms);
 
-        $i = 0;
         foreach ($keys as $key) {
-            $kid = isset( $key['kid'] ) ? $key['kid'] : 'no_kid_'.++$i;
+            $kid = isset( $key['kid'] ) ? $key['kid'] : null;
             $jose->getKeysetManager()->loadKeyFromValues($kid, $key);
         }
 
         $jwk_keys = array_merge(
             $jose->getKeysetManager()->getPrivateKeySet()->getKeys(),
+            $jose->getKeysetManager()->getSymmetricKeySet()->getKeys(),
             $jose->getKeysetManager()->getNoneKeySet()->getKeys()
             );
 
         foreach ($jwk_keys as $key) {
             try {
-                $jwt = $jose->sign($key->getKeyId(), $payload, array(
+                $jwt = $jose->sign($key, $payload, array(
                     'alg' => $alg,
                 ));
 
@@ -94,15 +94,14 @@ class SpomkyLabsJwt implements EncryptionInterface
         $jose = new Jose();
         $jose->getConfiguration()->set('algorithms', $this->algorithms);
 
-        $i = 0;
         foreach ($keys as $key) {
-            $kid = isset( $key['kid'] ) ? $key['kid'] : 'no_kid_'.++$i;
+            $kid = isset( $key['kid'] ) ? $key['kid'] : null;
             $jose->getKeysetManager()->loadKeyFromValues($kid, $key);
         }
 
         foreach ($jose->getKeysetManager()->getPublicKeySet()->getKeys() as $key) {
             try {
-                $jwt = $jose->encrypt($key->getKeyId(), $payload, array(
+                $jwt = $jose->encrypt($key, $payload, array(
                     'alg' => $alg,
                     'enc' => $enc,
                 ));
@@ -137,14 +136,14 @@ class SpomkyLabsJwt implements EncryptionInterface
             return false;
         }
 
-        $i = 0;
         foreach ($keys as $key) {
-            $kid = isset( $key['kid'] ) ? $key['kid'] : 'no_kid_'.++$i;
+            $kid = isset( $key['kid'] ) ? $key['kid'] : null;
             $jose->getKeysetManager()->loadKeyFromValues($kid, $key);
         }
 
         $jwk_keys = array_merge(
             $jose->getKeysetManager()->getPublicKeySet()->getKeys(),
+            $jose->getKeysetManager()->getSymmetricKeySet()->getKeys(),
             $jose->getKeysetManager()->getNoneKeySet()->getKeys()
             );
 
@@ -183,9 +182,8 @@ class SpomkyLabsJwt implements EncryptionInterface
             return false;
         }
 
-        $i = 0;
         foreach ($keys as $key) {
-            $kid = isset( $key['kid'] ) ? $key['kid'] : 'no_kid_'.++$i;
+            $kid = isset( $key['kid'] ) ? $key['kid'] : null;
             $jose->getKeysetManager()->loadKeyFromValues($kid, $key);
         }
 
@@ -208,15 +206,14 @@ class SpomkyLabsJwt implements EncryptionInterface
 
         $jwt = $jose->load($jwtdata);
         if ($jwt instanceof JWEInterface) {
-            $jwe_header = $jwt->getHeader();
+            $jwe_header = array_merge($jwt->getUnprotectedHeader(), $jwt->getProtectedHeader());
 
             if (empty($decryption_keys)) {
                 return $jwe_header;
             }
 
-            $i = 0;
             foreach ($keys as $key) {
-                $kid = isset( $key['kid'] ) ? $key['kid'] : 'no_kid_'.++$i;
+                $kid = isset( $key['kid'] ) ? $key['kid'] : null;
                 $jose->getKeysetManager()->loadKeyFromValues($kid, $key);
             }
 
@@ -233,7 +230,7 @@ class SpomkyLabsJwt implements EncryptionInterface
             return false;
         }
 
-        return array_merge($jwt->getPayload(), $jwt->getHeader(), $jwe_header);
+        return array_merge($jwt->getPayload(), $jwt->getUnprotectedHeader(), $jwt->getProtectedHeader(), $jwe_header);
     }
 
     public function getSignatureAlgorithms()

@@ -9,7 +9,7 @@ namespace OAuth2;
  * @see OAuth2\ResponseInterface
  *
  * This class borrows heavily from the Symfony2 Framework and is part of the symfony package
- * @see Symfony\Component\HttpFoundation\Request (https://github.com/symfony/symfony)
+ * @see Symfony\Component\HttpFoundation\Response (https://github.com/symfony/symfony)
  */
 class Response implements ResponseInterface
 {
@@ -18,6 +18,7 @@ class Response implements ResponseInterface
     protected $statusText;
     protected $parameters = array();
     protected $httpHeaders = array();
+    protected $errorAsFragment = false;
     protected $jwt;
 
     public static $statusTexts = array(
@@ -173,6 +174,16 @@ class Response implements ResponseInterface
         return isset($this->httpHeaders[$name]) ? $this->httpHeaders[$name] : $default;
     }
 
+    public function getErrorAsFragment()
+    {
+        return $this->errorAsFragment;
+    }
+
+    public function setErrorAsFragment($value)
+    {
+        $this->errorAsFragment = $value;
+    }
+
     public function setJWT( $jwt )
     {
         $this->jwt = $jwt;
@@ -284,7 +295,11 @@ class Response implements ResponseInterface
         if (count($this->parameters) > 0) {
             // add parameters to URL redirection
             $parts = parse_url($url);
-            $sep = isset($parts['query']) && count($parts['query']) > 0 ? '&' : '?';
+            if ($this->errorAsFragment) {
+                $sep = !empty($parts['fragment']) ? '&' : '#';
+            } else {
+                $sep = !empty($parts['query']) ? '&' : '?';
+            }
             $url .= $sep . http_build_query($this->parameters);
         }
 

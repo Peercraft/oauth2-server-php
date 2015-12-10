@@ -2,8 +2,6 @@
 
 namespace OAuth2\Storage;
 
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
-
 /**
  * Simple MongoDB storage for all storage types
  *
@@ -21,8 +19,7 @@ class Mongo implements AuthorizationCodeInterface,
     ClientCredentialsInterface,
     UserCredentialsInterface,
     RefreshTokenInterface,
-    JwtBearerInterface,
-    OpenIDAuthorizationCodeInterface
+    JwtBearerInterface
 {
     protected $db;
     protected $config;
@@ -111,32 +108,6 @@ class Mongo implements AuthorizationCodeInterface,
         return true;
     }
 
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getClientKey($client_id, $subject)
     {
         $result = $this->collection('jwt_table')->findOne(array(
@@ -196,7 +167,7 @@ class Mongo implements AuthorizationCodeInterface,
         return is_null($code) ? false : $code;
     }
 
-    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null)
     {
         // if it exists, update it.
         if ($this->getAuthorizationCode($code)) {
@@ -208,7 +179,6 @@ class Mongo implements AuthorizationCodeInterface,
                     'redirect_uri' => $redirect_uri,
                     'expires' => $expires,
                     'scope' => $scope,
-                    'id_token' => $id_token,
                 ))
             );
         } else {
@@ -219,7 +189,6 @@ class Mongo implements AuthorizationCodeInterface,
                 'redirect_uri' => $redirect_uri,
                 'expires' => $expires,
                 'scope' => $scope,
-                'id_token' => $id_token,
             );
             $this->collection('code_table')->insert($token);
         }

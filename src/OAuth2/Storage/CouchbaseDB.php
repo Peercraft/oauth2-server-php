@@ -2,8 +2,6 @@
 
 namespace OAuth2\Storage;
 
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
-
 /**
  * Simple Couchbase storage for all storage types
  *
@@ -19,8 +17,7 @@ class CouchbaseDB implements AuthorizationCodeInterface,
     ClientCredentialsInterface,
     UserCredentialsInterface,
     RefreshTokenInterface,
-    JwtBearerInterface,
-    OpenIDAuthorizationCodeInterface
+    JwtBearerInterface
 {
     protected $db;
     protected $config;
@@ -120,32 +117,6 @@ class CouchbaseDB implements AuthorizationCodeInterface,
         return true;
     }
 
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
-    }
-
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getClientKey($client_id, $subject)
     {
         if (!$jwt = $this->getObjectByType('jwt_table',$client_id)) {
@@ -199,7 +170,7 @@ class CouchbaseDB implements AuthorizationCodeInterface,
         return is_null($code) ? false : $code;
     }
 
-    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($code, $client_id, $user_id, $redirect_uri, $expires, $scope = null)
     {
         // if it exists, update it.
         if ($this->getAuthorizationCode($code)) {
@@ -210,7 +181,6 @@ class CouchbaseDB implements AuthorizationCodeInterface,
                 'redirect_uri' => $redirect_uri,
                 'expires' => $expires,
                 'scope' => $scope,
-                'id_token' => $id_token,
             ));
         } else {
             $this->setObjectByType('code_table',$code,array(
@@ -220,7 +190,6 @@ class CouchbaseDB implements AuthorizationCodeInterface,
                 'redirect_uri' => $redirect_uri,
                 'expires' => $expires,
                 'scope' => $scope,
-                'id_token' => $id_token,
             ));
         }
 

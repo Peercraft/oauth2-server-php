@@ -6,7 +6,6 @@ use phpcassa\ColumnFamily;
 use phpcassa\ColumnSlice;
 use phpcassa\Connection\ConnectionPool;
 use OAuth2\OpenID\Storage\UserClaimsInterface;
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
 
 /**
  * Cassandra storage for all storage types
@@ -37,8 +36,7 @@ class Cassandra implements AuthorizationCodeInterface,
     JwtBearerInterface,
     ScopeInterface,
     PublicKeyInterface,
-    UserClaimsInterface,
-    OpenIDAuthorizationCodeInterface
+    UserClaimsInterface
 {
 
     private $cache;
@@ -152,11 +150,11 @@ class Cassandra implements AuthorizationCodeInterface,
         return $this->getValue($this->config['code_key'] . $code);
     }
 
-    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null, $id_token = null)
+    public function setAuthorizationCode($authorization_code, $client_id, $user_id, $redirect_uri, $expires, $scope = null)
     {
         return $this->setValue(
             $this->config['code_key'] . $authorization_code,
-            compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope', 'id_token'),
+            compact('authorization_code', 'client_id', 'user_id', 'redirect_uri', 'expires', 'scope'),
             $expires
         );
     }
@@ -244,19 +242,6 @@ class Cassandra implements AuthorizationCodeInterface,
             $this->config['client_key'] . $client_id,
             compact('client_id', 'client_secret', 'redirect_uri', 'grant_types', 'scope', 'user_id')
         );
-    }
-
-    public function checkRestrictedGrantType($client_id, $grant_type)
-    {
-        $details = $this->getClientDetails($client_id);
-        if (isset($details['grant_types'])) {
-            $grant_types = explode(' ', $details['grant_types']);
-
-            return in_array($grant_type, (array) $grant_types);
-        }
-
-        // if grant_types are not defined, then none are restricted
-        return true;
     }
 
     public function getClientKey($client_id, $subject)
@@ -358,19 +343,6 @@ class Cassandra implements AuthorizationCodeInterface,
     }
 
     /*ScopeInterface */
-    public function getClientScope($client_id)
-    {
-        if (!$clientDetails = $this->getClientDetails($client_id)) {
-            return false;
-        }
-
-        if (isset($clientDetails['scope'])) {
-            return $clientDetails['scope'];
-        }
-
-        return null;
-    }
-
     public function getJti($client_id, $subject, $audience, $expiration, $jti)
     {
         //TODO: Needs cassandra implementation.

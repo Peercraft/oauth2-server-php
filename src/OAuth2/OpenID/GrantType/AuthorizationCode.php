@@ -2,8 +2,10 @@
 
 namespace OAuth2\OpenID\GrantType;
 
+use OAuth2\OpenID\ResponseType\IdTokenInterface;
 use OAuth2\GrantType\AuthorizationCode as BaseAuthorizationCode;
 use OAuth2\ResponseType\AccessTokenInterface;
+use OAuth2\Storage\AuthorizationCodeInterface;
 
 /**
  *
@@ -11,19 +13,37 @@ use OAuth2\ResponseType\AccessTokenInterface;
  */
 class AuthorizationCode extends BaseAuthorizationCode
 {
-    public function createAccessToken(AccessTokenInterface $accessToken, $client_id, $user_id, $scope)
+    protected $idToken;
+
+    public function __construct(AuthorizationCodeInterface $storage, IdTokenInterface $idToken)
     {
+        $this->idToken = $idToken;
+
+        parent::__construct($storage);
+    }
+
+    public function createAccessToken(AccessTokenInterface $accessTokenResponseType, $client_id, $user_id, $scope)
+    {
+        $scopes = explode(' ', trim($scope));
+
         $includeRefreshToken = true;
-        if (isset($this->authCode['id_token'])) {
+        if (in_array('openid', $scopes)) {
             // OpenID Connect requests include the refresh token only if the
             // offline_access scope has been requested and granted.
-            $scopes = explode(' ', trim($scope));
             $includeRefreshToken = in_array('offline_access', $scopes);
         }
 
-        $token = $accessToken->createAccessToken($client_id, $user_id, $scope, $includeRefreshToken);
-        if (isset($this->authCode['id_token'])) {
-            $token['id_token'] = $this->authCode['id_token'];
+        $access_token = $accessTokenResponseType->generateAccessToken();
+        $token = $accessTokenResponseType->saveAccessToken($access_token, $client_id, $user_id, $scope, $includeRefreshToken, $this->authCode['code']);
+
+        if (in_array('openid', $scopes)) {
+            $params = $this->authCode['params'];
+            $params['authorization_code'] = $this->authCode['code'];
+            $params['access_token'] = $access_token;
+
+            $userInfo = $this->authCode['userInfo'];
+
+            $token['id_token'] = $this->idToken->createIdToken($params, $userInfo);
         }
 
         $this->storage->expireAuthorizationCode($this->authCode['code']);

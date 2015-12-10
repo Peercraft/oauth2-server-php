@@ -38,6 +38,13 @@ class AuthorizationCode implements GrantTypeInterface
         }
 
         $code = $request->request('code');
+
+        /*
+         * 4.1.2 - If a code is used more than once, the authorization server SHOULD revoke all tokens previously issued based on that code
+         * @uri - http://tools.ietf.org/html/rfc6749#section-4.1.2
+         */
+        $this->storage->invalidateTokensFromAuthorizationCode($code);
+
         if (!$authCode = $this->storage->getAuthorizationCode($code)) {
             $response->setError(400, 'invalid_grant', 'Authorization code doesn\'t exist or is invalid for the client');
 
@@ -48,8 +55,8 @@ class AuthorizationCode implements GrantTypeInterface
          * 4.1.3 - ensure that the "redirect_uri" parameter is present if the "redirect_uri" parameter was included in the initial authorization request
          * @uri - http://tools.ietf.org/html/rfc6749#section-4.1.3
          */
-        if (isset($authCode['redirect_uri']) && $authCode['redirect_uri']) {
-            if (!$request->request('redirect_uri') || urldecode($request->request('redirect_uri')) != $authCode['redirect_uri']) {
+        if (isset($authCode['params']['redirect_uri']) && $authCode['params']['redirect_uri']) {
+            if (!$request->request('redirect_uri') || urldecode($request->request('redirect_uri')) != $authCode['params']['redirect_uri']) {
                 $response->setError(400, 'redirect_uri_mismatch', "The redirect URI is missing or do not match", "#section-4.1.3");
 
                 return false;
@@ -82,7 +89,7 @@ class AuthorizationCode implements GrantTypeInterface
 
     public function getScope()
     {
-        return isset($this->authCode['scope']) ? $this->authCode['scope'] : null;
+        return isset($this->authCode['params']['scope']) ? $this->authCode['params']['scope'] : null;
     }
 
     public function getUserId()
@@ -92,7 +99,7 @@ class AuthorizationCode implements GrantTypeInterface
 
     public function createAccessToken(AccessTokenInterface $accessToken, $client_id, $user_id, $scope)
     {
-        $token = $accessToken->createAccessToken($client_id, $user_id, $scope);
+        $token = $accessToken->saveAccessToken($accessToken->generateAccessToken(), $client_id, $user_id, $scope, $this->authCode['code']);
         $this->storage->expireAuthorizationCode($this->authCode['code']);
 
         return $token;

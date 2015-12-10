@@ -15,15 +15,31 @@ class IdTokenToken implements IdTokenTokenInterface
         $this->idToken = $idToken;
     }
 
-    public function getAuthorizeResponse($params, $user_id = null)
+    public function getAuthorizeResponse($params, $userInfo = null)
     {
-        $result = $this->accessToken->getAuthorizeResponse($params, $user_id);
-        $access_token = $result[1]['fragment']['access_token'];
-        $result2 = $this->idToken->getAuthorizeResponse($params, $user_id, $access_token, null);
+        // build the URL to redirect to
+        $result = array('query' => array());
 
-        // Merge IdToken fragment into Token fragment
-        $result[1]['fragment'] = array_merge($result[1]['fragment'], $result2[1]['fragment']);
+        $params += array('scope' => null, 'state' => null);
 
-        return $result;
+        /*
+         * a refresh token MUST NOT be included in the fragment
+         *
+         * @see http://tools.ietf.org/html/rfc6749#section-4.2.2
+         */
+        $includeRefreshToken = false;
+
+        $access_token = $this->accessToken->generateAccessToken();
+        $result["fragment"] = $this->accessToken->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
+
+        $params['access_token'] = $access_token;
+        $id_token = $this->idToken->createIdToken($params, $userInfo);
+        $result["fragment"]["id_token"] = $id_token;
+
+        if (isset($params['state'])) {
+            $result["fragment"]["state"] = $params['state'];
+        }
+
+        return array($params['redirect_uri'], $result);
     }
 }

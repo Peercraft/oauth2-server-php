@@ -32,18 +32,14 @@ class IdToken implements IdTokenInterface
         }
     }
 
-    public function getAuthorizeResponse($params, $userInfo = null, $access_token = null, $authorization_code = null)
+    public function getAuthorizeResponse($params, $userInfo = null)
     {
         // build the URL to redirect to
-        $result = array('query' => array());
-        $params += array('scope' => null, 'state' => null, 'nonce' => null);
+        $result = array('query' => array(), 'fragment' => array());
 
-        // create the id token.
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
-        $userClaims = $this->userClaimsStorage->getUserClaims($user_id, $params['scope'], $params['client_id']);
+        $id_token = $this->createIdToken($params, $userInfo);
+        $result["fragment"]["id_token"] = $id_token;
 
-        $id_token = $this->createIdToken($params['client_id'], $userInfo, $params['nonce'], $userClaims, $access_token, $authorization_code);
-        $result["fragment"] = array('id_token' => $id_token);
         if (isset($params['state'])) {
             $result["fragment"]["state"] = $params['state'];
         }
@@ -51,37 +47,53 @@ class IdToken implements IdTokenInterface
         return array($params['redirect_uri'], $result);
     }
 
-    public function createIdToken($client_id, $userInfo, $nonce = null, $userClaims = null, $access_token = null, $authorization_code = null)
+    public function createIdToken($params, $userInfo = null)
     {
-        // pull auth_time from user info if supplied
-        list($user_id, $auth_time) = $this->getUserIdAndAuthTime($userInfo);
+        $params += array('scope' => null, 'state' => null, 'nonce' => null, 'access_token' => null, 'authorization_code' => null);
 
         $token = array(
             'iss'        => $this->config['issuer'],
-            'sub'        => $user_id,
-            'aud'        => $client_id,
+            'aud'        => $params['client_id'],
             'iat'        => time(),
             'exp'        => time() + $this->config['id_lifetime'],
-            'auth_time'  => $auth_time,
         );
 
-        if ($nonce) {
-            $token['nonce'] = $nonce;
+        if (is_array($userInfo)) {
+            if (!isset($userInfo['user_id'])) {
+                throw new \LogicException('if $user_id argument is an array, user_id index must be set');
+            }
+
+            $token['sub'] = $user_id = $userInfo['user_id'];
+
+            if (isset($userInfo['auth_time'])) {
+                $token['auth_time'] = $userInfo['auth_time'];
+            }
+
+            if (isset($userInfo['acr'])) {
+                $token['acr'] = $userInfo['acr'];
+            }
+        } else {
+            $token['sub'] = $user_id = $userInfo;
         }
 
+        if ($params['nonce']) {
+            $token['nonce'] = $params['nonce'];
+        }
+
+        if ($params['access_token']) {
+            $token['at_hash'] = $this->createAtHash($params['access_token'], $params['client_id']);
+        }
+
+        if ($params['authorization_code']) {
+            $token['c_hash'] = $this->createAtHash($params['authorization_code'], $params['client_id']);
+        }
+
+        $userClaims = $this->userClaimsStorage->getUserClaims($user_id, $params['scope'], $params['client_id'], 'id_token');
         if ($userClaims) {
             $token += $userClaims;
         }
 
-        if ($access_token) {
-            $token['at_hash'] = $this->createAtHash($access_token, $client_id);
-        }
-
-        if ($authorization_code) {
-            $token['c_hash'] = $this->createAtHash($authorization_code, $client_id);
-        }
-
-        return $this->encodeToken($token, $client_id);
+        return $this->encodeToken($token, $params['client_id']);
     }
 
     protected function createAtHash($access_token, $client_id)
@@ -120,29 +132,5 @@ class IdToken implements IdTokenInterface
         }
 
         return $claims;
-    }
-
-    protected function getUserIdAndAuthTime($userInfo)
-    {
-        $auth_time = null;
-
-        // support an array for user_id / auth_time
-        if (is_array($userInfo)) {
-            if (!isset($userInfo['user_id'])) {
-                throw new \LogicException('if $user_id argument is an array, user_id index must be set');
-            }
-
-            $auth_time = isset($userInfo['auth_time']) ? $userInfo['auth_time'] : null;
-            $user_id = $userInfo['user_id'];
-        } else {
-            $user_id = $userInfo;
-        }
-
-        if (is_null($auth_time)) {
-            $auth_time = time();
-        }
-
-        // userInfo is a scalar, and so this is the $user_id. Auth Time is null
-        return array($user_id, $auth_time);
     }
 }

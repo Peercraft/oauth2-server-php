@@ -11,8 +11,6 @@ use OAuth2\OpenID\Controller\DiscoveryController;
 use OAuth2\OpenID\Controller\DynRegControllerInterface;
 use OAuth2\OpenID\Controller\DynRegController;
 use OAuth2\OpenID\Controller\AuthorizeController as OpenIDAuthorizeController;
-use OAuth2\OpenID\ResponseType\AuthorizationCode as OpenIDAuthorizationCodeResponseType;
-use OAuth2\OpenID\Storage\AuthorizationCodeInterface as OpenIDAuthorizationCodeInterface;
 use OAuth2\OpenID\GrantType\AuthorizationCode as OpenIDAuthorizationCodeGrantType;
 use OAuth2\Controller\AuthorizeControllerInterface;
 use OAuth2\Controller\AuthorizeController;
@@ -35,7 +33,7 @@ use OAuth2\GrantType\GrantTypeInterface;
 use OAuth2\GrantType\UserCredentials;
 use OAuth2\GrantType\ClientCredentials;
 use OAuth2\GrantType\RefreshToken;
-use OAuth2\GrantType\AuthorizationCode;
+use OAuth2\GrantType\AuthorizationCode as AuthorizationCodeGrantType;
 use OAuth2\Storage\JwtAccessToken as JwtAccessTokenStorage;
 use OAuth2\Storage\JwtAccessTokenInterface;
 use OAuth2\Encryption\EncryptionInterface;
@@ -413,6 +411,11 @@ class Server implements ResourceControllerInterface,
         return $value;
     }
 
+    public function getAuthorizeRequestObject()
+    {
+        return $this->getAuthorizeController()->getRequestObject();
+    }
+
     public function verifyResourceRequest(RequestInterface $request, ResponseInterface $response = null, $scope = null)
     {
         $this->response = is_null($response) ? new Response() : $response;
@@ -573,8 +576,8 @@ class Server implements ResourceControllerInterface,
                     if (!isset($this->storages['client_credentials'])) {
                         throw new \LogicException("You must supply a storage object implementing OAuth2\Storage\ClientCredentialsInterface to use the token server");
                     }
-                    $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_credentials_in_request_body allow_public_clients')));
-                    $this->clientAssertionType = new HttpBasic($this->storages['client_credentials'], $config);
+                    $config = array_intersect_key($this->config, array_flip(explode(' ', 'allow_credentials_in_request_body allow_public_clients allowed_algorithms token_endpoint')));
+                    $this->clientAssertionType = new HttpBasic($this->storages['client_credentials'], $this->storages['public_key'], $this->storages['jwt_bearer'], $config, $this->getEncryptionUtil());
                     break;
                 }
             }
@@ -663,24 +666,19 @@ class Server implements ResourceControllerInterface,
             $responseTypes['token'] = $this->getAccessTokenResponseType();
             if ($this->config['use_openid_connect']) {
                 $responseTypes['id_token'] = $this->getIdTokenResponseType();
-                $responseTypes['id_token token'] = $this->getIdTokenTokenResponseType();
+                $responseTypes['id_token token'] = new IdTokenToken($responseTypes['token'], $responseTypes['id_token']);
             }
         }
 
         if (isset($this->storages['authorization_code'])) {
             $config = array_intersect_key($this->config, array_flip(explode(' ', 'enforce_redirect auth_code_lifetime')));
+            $responseTypes['code'] = new AuthorizationCodeResponseType($this->storages['authorization_code'], $config);
             if ($this->config['use_openid_connect']) {
-                if (!$this->storages['authorization_code'] instanceof OpenIDAuthorizationCodeInterface) {
-                    throw new \LogicException("Your authorization_code storage must implement OAuth2\OpenID\Storage\AuthorizationCodeInterface to work when 'use_openid_connect' is true");
-                }
-                $responseTypes['code'] = new OpenIDAuthorizationCodeResponseType($this->storages['authorization_code'], $config);
                 if ($this->config['allow_implicit']) {
                     $responseTypes['code id_token'] = new CodeIdToken($responseTypes['code'], $responseTypes['id_token']);
                     $responseTypes['code token'] = new CodeToken($responseTypes['code'], $responseTypes['token']);
-                    $responseTypes['code id_token token'] = new CodeIdTokenToken($responseTypes['code token'], $responseTypes['id_token']);
+                    $responseTypes['code id_token token'] = new CodeIdTokenToken($responseTypes['code'], $responseTypes['id_token'], $responseTypes['token']);
                 }
-            } else {
-                $responseTypes['code'] = new AuthorizationCodeResponseType($this->storages['authorization_code'], $config);
             }
         }
 
@@ -700,8 +698,8 @@ class Server implements ResourceControllerInterface,
         }
 
         if (isset($this->storages['client_credentials'])) {
-            $config = array_intersect_key($this->config, array('allow_credentials_in_request_body' => ''));
-            $grantTypes['client_credentials'] = new ClientCredentials($this->storages['client_credentials'], $config);
+            $config = array_intersect_key($this->config, array('allow_credentials_in_request_body' => '', 'allowed_algorithms' => '', 'token_endpoint' => ''));
+            $grantTypes['client_credentials'] = new ClientCredentials($this->storages['client_credentials'], $this->storages['public_key'], $this->storages['jwt_bearer'], $config, $this->getEncryptionUtil());
         }
 
         if (isset($this->storages['refresh_token'])) {
@@ -711,12 +709,9 @@ class Server implements ResourceControllerInterface,
 
         if (isset($this->storages['authorization_code'])) {
             if ($this->config['use_openid_connect']) {
-                if (!$this->storages['authorization_code'] instanceof OpenIDAuthorizationCodeInterface) {
-                    throw new \LogicException("Your authorization_code storage must implement OAuth2\OpenID\Storage\AuthorizationCodeInterface to work when 'use_openid_connect' is true");
-                }
-                $grantTypes['authorization_code'] = new OpenIDAuthorizationCodeGrantType($this->storages['authorization_code']);
+                $grantTypes['authorization_code'] = new OpenIDAuthorizationCodeGrantType($this->storages['authorization_code'], $this->getIdTokenResponseType());
             } else {
-                $grantTypes['authorization_code'] = new AuthorizationCode($this->storages['authorization_code']);
+                $grantTypes['authorization_code'] = new AuthorizationCodeGrantType($this->storages['authorization_code']);
             }
         }
 
@@ -747,15 +742,6 @@ class Server implements ResourceControllerInterface,
         }
 
         return $this->createDefaultIdTokenResponseType();
-    }
-
-    protected function getIdTokenTokenResponseType()
-    {
-        if (isset($this->responseTypes['id_token token'])) {
-            return $this->responseTypes['id_token token'];
-        }
-
-        return $this->createDefaultIdTokenTokenResponseType();
     }
 
     /**
@@ -830,11 +816,6 @@ class Server implements ResourceControllerInterface,
         $config = array_intersect_key($this->config, array_flip(explode(' ', 'issuer id_lifetime allowed_algorithms')));
 
         return new IdToken($this->storages['user_claims'], $this->storages['public_key'], $config, $this->getEncryptionUtil());
-    }
-
-    protected function createDefaultIdTokenTokenResponseType()
-    {
-        return new IdTokenToken($this->getAccessTokenResponseType(), $this->getIdTokenResponseType());
     }
 
     protected function validateOpenIdConnect()

@@ -59,7 +59,7 @@ class UserInfoController extends ResourceController implements UserInfoControlle
         }
 
         $token = $this->getToken();
-        $claims = $this->userClaimsStorage->getUserClaims($token['user_id'], $token['scope'], $token['client_id']);
+        $claims = $this->userClaimsStorage->getUserClaims($token['user_id'], $token['scope'], $token['client_id'], 'userinfo');
         // The sub Claim MUST always be returned in the UserInfo Response.
         // http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
         $claims += array(

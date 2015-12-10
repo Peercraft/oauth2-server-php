@@ -19,7 +19,7 @@ class JwtAccessTokenTest extends \PHPUnit_Framework_TestCase
         $server = $this->getTestServer();
         $jwtResponseType = $server->getResponseType('token');
 
-        $accessToken = $jwtResponseType->createAccessToken('Test Client ID', 123, 'test', false);
+        $accessToken = $jwtResponseType->saveAccessToken($jwtResponseType->generateAccessToken(), 'Test Client ID', 123, 'test', false);
         $jwt = new Jwt;
         $decodedAccessToken = $jwt->decode($accessToken['access_token'], null, false);
 
