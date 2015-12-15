@@ -13,21 +13,48 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
 {
     private $nonce;
     private $requestObject = array();
+    private $idTokenHint = array();
 
-    protected function setNotAuthorizedResponse(RequestInterface $request, ResponseInterface $response, $redirect_uri, $user_id = null)
+    protected function setNotAuthorizedResponse(RequestInterface $request, ResponseInterface $response, $redirect_uri, $userInfo = null)
     {
+        $request_params = array_merge( $request->request, $request->query, $this->requestObject );
+
+        if (isset($request_params['claims']) && is_string($request_params['claims']) && $request_params['claims'][0] === '{')
+        {
+            $request_params['claims'] = json_decode($request_params['claims'], true);
+        }
+
+        $claims = isset($request_params['claims']) ? $request_params['claims'] : array();
+
+        $want_user = '';
+        if (!empty($this->idTokenHint['sub'])) {
+            $want_user = $this->idTokenHint['sub'];
+        }
+        elseif (!empty($claims['id_token']['sub']['value'])) {
+            $want_user = $claims['id_token']['sub']['value'];
+        }
+        elseif (!empty($claims['userinfo']['sub']['value'])) {
+            $want_user = $claims['userinfo']['sub']['value'];
+        }
+
         $prompt = $request->query('prompt', 'consent');
-        if ($prompt == 'none') {
-            if (is_null($user_id)) {
-                $error = 'login_required';
-                $error_message = 'The user must log in';
-            } else {
+
+        $user_id = is_array( $userInfo ) ? $userInfo[ 'user_id' ] : $userInfo;
+
+        if (!empty( $want_user ) && !empty( $user_id ) && $want_user !== $user_id) {
+            $error = 'login_required';
+            $error_message = 'The user is logged with a diffent account';
+        } elseif (is_null($userInfo)) {
+            $error = 'login_required';
+            $error_message = 'The user must log in';
+        } else {
+            if ($prompt == 'none') {
                 $error = 'interaction_required';
                 $error_message = 'The user must grant access to your application';
+            } else {
+                $error = 'consent_required';
+                $error_message = 'The user denied access to your application';
             }
-        } else {
-            $error = 'consent_required';
-            $error_message = 'The user denied access to your application';
         }
 
         $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $this->getState(), $error, $error_message);
@@ -35,14 +62,29 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
 
     protected function buildAuthorizeParameters($request, $response, $userInfo)
     {
-        if (!$params = parent::buildAuthorizeParameters($request, $response, $userInfo)) {
+        if (!$build_params = parent::buildAuthorizeParameters($request, $response, $userInfo)) {
             return;
         }
 
         // add the nonce to return with the redirect URI
-        $params['nonce'] = $this->nonce;
+        $build_params['nonce'] = $this->nonce;
 
-        return $params;
+        $request_params = array_merge( $request->request, $request->query, $this->requestObject );
+
+        if (isset($request_params['claims']) && is_string($request_params['claims']) && $request_params['claims'][0] === '{')
+        {
+            $request_params['claims'] = json_decode($request_params['claims'], true);
+        }
+
+        $claims = isset($request_params['claims']) ? $request_params['claims'] : array();
+
+        if (!empty($claims['id_token'])) {
+            $build_params['only_id_token_claims'] = array_keys($claims['id_token']);
+        } else {
+            $build_params['only_id_token_claims'] = array();
+        }
+
+        return $build_params;
     }
 
     public function validateAuthorizeRequest(RequestInterface $request, ResponseInterface $response)
@@ -62,10 +104,11 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             return false;
         }
 
-        $nonce = $request->query('nonce');
+        $param_nonce = $request->query('nonce');
         $param_request = $request->query('request');
         $param_request_uri = $request->query('request_uri');
         $param_registration = $request->query('registration');
+        $param_id_token_hint = $request->query('id_token_hint');
 
         $request_jwt = null;
         if (!empty($param_request)) {
@@ -149,13 +192,22 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             return false;
         }
 
+        if (!empty($param_id_token_hint)) {
+            list($sig_alg, $enc_alg, $enc_enc) = $this->publicKeyStorage->getEncryptionAlgorithms($this->getClientId(), 'id_token_hint');
+
+            $private_keys = $this->publicKeyStorage->getPrivateDecryptionKeys($this->getClientId(), 'id_token_hint');
+            $param_id_token_hint_data = $this->encryptionUtil->unsafeDecode($param_id_token_hint, $private_keys);
+
+            $this->idTokenHint = $param_id_token_hint_data;
+        }
+
         // Validate required nonce for "id_token" and "id_token token"
-        if (!$nonce && in_array($this->getResponseType(), array('id_token', 'id_token token', 'code id_token', 'code token', 'code id_token token'))) {
+        if (!$param_nonce && in_array($this->getResponseType(), array('id_token', 'id_token token', 'code id_token', 'code token', 'code id_token token'))) {
             $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_request', 'Nonce parameter is required for implicit and hybrid flows');
             return false;
         }
 
-        $this->nonce = $nonce;
+        $this->nonce = $param_nonce;
 
         return true;
     }
@@ -213,5 +265,10 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
     public function getRequestObject()
     {
         return $this->requestObject;
+    }
+
+    public function getIdTokenHint()
+    {
+        return $this->idTokenHint;
     }
 }

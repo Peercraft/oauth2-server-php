@@ -416,6 +416,11 @@ class Server implements ResourceControllerInterface,
         return $this->getAuthorizeController()->getRequestObject();
     }
 
+    public function getIdTokenHint()
+    {
+        return $this->getAuthorizeController()->getIdTokenHint();
+    }
+
     public function verifyResourceRequest(RequestInterface $request, ResponseInterface $response = null, $scope = null)
     {
         $this->response = is_null($response) ? new Response() : $response;

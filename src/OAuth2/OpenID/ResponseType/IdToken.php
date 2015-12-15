@@ -49,7 +49,14 @@ class IdToken implements IdTokenInterface
 
     public function createIdToken($params, $userInfo = null)
     {
-        $params += array('scope' => null, 'state' => null, 'nonce' => null, 'access_token' => null, 'authorization_code' => null);
+        $params += array(
+            'scope' => null,
+            'state' => null,
+            'nonce' => null,
+            'access_token' => null,
+            'authorization_code' => null,
+            'only_id_token_claims' => null,
+            );
 
         $token = array(
             'iss'        => $this->config['issuer'],
@@ -90,6 +97,9 @@ class IdToken implements IdTokenInterface
 
         $userClaims = $this->userClaimsStorage->getUserClaims($user_id, $params['scope'], $params['client_id'], 'id_token');
         if ($userClaims) {
+            if (isset($params['only_id_token_claims'])) {
+                $userClaims = array_intersect_key($userClaims, array_flip($params['only_id_token_claims']));
+            }
             $token += $userClaims;
         }
 
