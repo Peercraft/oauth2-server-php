@@ -18,9 +18,6 @@ class CodeToken implements CodeTokenInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        // build the URL to redirect to
-        $result = array('query' => array());
-
         $params += array('scope' => null, 'state' => null);
 
         /*
@@ -31,16 +28,26 @@ class CodeToken implements CodeTokenInterface
         $includeRefreshToken = false;
 
         $access_token = $this->accessToken->generateAccessToken();
-        $result["fragment"] = $this->accessToken->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
+        $uri_params = $this->accessToken->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
 
         $code = $this->authCode->generateAuthorizationCode();
         $this->authCode->saveAuthorizationCode($code, $params, $userInfo);
-        $result["fragment"]["code"] = $code;
+        $uri_params["code"] = $code;
 
         if (isset($params['state'])) {
-            $result["fragment"]["state"] = $params['state'];
+            $uri_params["state"] = $params['state'];
         }
 
-        return array($params['redirect_uri'], $result);
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array('query');
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'fragment';
     }
 }

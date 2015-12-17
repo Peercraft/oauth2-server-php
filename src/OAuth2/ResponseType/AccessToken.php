@@ -41,9 +41,6 @@ class AccessToken implements AccessTokenInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        // build the URL to redirect to
-        $result = array('query' => array());
-
         $params += array('scope' => null, 'state' => null);
 
         /*
@@ -54,13 +51,23 @@ class AccessToken implements AccessTokenInterface
         $includeRefreshToken = false;
 
         $access_token = $this->generateAccessToken();
-        $result["fragment"] = $this->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
+        $uri_params = $this->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
 
         if (isset($params['state'])) {
-            $result["fragment"]["state"] = $params['state'];
+            $uri_params["state"] = $params['state'];
         }
 
-        return array($params['redirect_uri'], $result);
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array('query');
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'fragment';
     }
 
     /**

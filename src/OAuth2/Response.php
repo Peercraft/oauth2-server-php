@@ -18,7 +18,8 @@ class Response implements ResponseInterface
     protected $statusText;
     protected $parameters = array();
     protected $httpHeaders = array();
-    protected $errorAsFragment = false;
+    protected $responseMode = 'query';
+    protected $redirectUrl;
     protected $jwt;
 
     public static $statusTexts = array(
@@ -174,14 +175,14 @@ class Response implements ResponseInterface
         return isset($this->httpHeaders[$name]) ? $this->httpHeaders[$name] : $default;
     }
 
-    public function getErrorAsFragment()
+    public function getResponseMode()
     {
-        return $this->errorAsFragment;
+        return $this->responseMode;
     }
 
-    public function setErrorAsFragment($value)
+    public function setResponseMode($value)
     {
-        $this->errorAsFragment = $value;
+        $this->responseMode = $value;
     }
 
     public function setJWT( $jwt )
@@ -201,18 +202,39 @@ class Response implements ResponseInterface
                 return $this->jwt;
             case 'json':
                 return json_encode($this->parameters);
-            case 'xml':
-                // this only works for single-level arrays
-                $xml = new \SimpleXMLElement('<response/>');
-                foreach ($this->parameters as $key => $param) {
-                    $xml->addChild($key, $param);
+            case 'form_post':
+                $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Redirecting</title>
+</head>
+<body>
+<div id="text" style="display: none;">Please wait - redirecting...</div>
+<form action="'.htmlspecialchars($this->redirectUrl).'" method="POST">
+';
+
+                foreach($this->parameters as $key => $value) {
+                    $html .= '<input type="hidden" name="'.htmlspecialchars($key).'" value="'.htmlspecialchars($value).'">
+                    ';
                 }
 
-                return $xml->asXML();
+                $html .= '<noscript>
+<button type="submit">Continue</button>
+</noscript>
+</form>
+<script>
+document.getElementById("text").style.display = "";
+document.forms[0].submit();
+</script>
+</body>
+</html>';
+
+                return $html;
+            case 'redirect':
+                return '';
         }
 
         throw new \InvalidArgumentException(sprintf('The format %s is not supported', $format));
-
     }
 
     public function send($format = 'json')
@@ -222,8 +244,14 @@ class Response implements ResponseInterface
             return;
         }
 
-        if( $this->jwt ) {
+        if ($this->jwt) {
             $format = "jwt";
+        } elseif ($this->redirectUrl) {
+            if ($this->responseMode === 'form_post') {
+                $format = "form_post";
+            } else {
+                $format = "redirect";
+            }
         }
 
         switch ($format) {
@@ -233,12 +261,30 @@ class Response implements ResponseInterface
             case 'json':
                 $this->setHttpHeader('Content-Type', 'application/json');
                 break;
-            case 'xml':
-                $this->setHttpHeader('Content-Type', 'text/xml');
+            case 'form_post':
+                $this->setStatusCode(200);
+                $this->setHttpHeader('Content-Type', 'text/html; charset=UTF-8');
                 break;
         }
+
         // status
         header(sprintf('HTTP/%s %s %s', $this->version, $this->statusCode, $this->statusText));
+
+        if ($format==="redirect") {
+            $url = $this->redirectUrl;
+
+            if (count($this->parameters) > 0) {
+                if ($this->responseMode === 'fragment') {
+                    $uri_params = array('fragment' => $this->parameters);
+                } else {
+                    $uri_params = array('query' => $this->parameters);
+                }
+
+                $url = $this->buildUri($url, $uri_params);
+            }
+
+            $this->addHttpHeaders(array('Location' =>  $url));
+        }
 
         foreach ($this->getHttpHeaders() as $name => $header) {
             header(sprintf('%s: %s', $name, $header));
@@ -291,19 +337,7 @@ class Response implements ResponseInterface
         }
         $this->setStatusCode($statusCode);
         $this->addParameters($parameters);
-
-        if (count($this->parameters) > 0) {
-            // add parameters to URL redirection
-            $parts = parse_url($url);
-            if ($this->errorAsFragment) {
-                $sep = !empty($parts['fragment']) ? '&' : '#';
-            } else {
-                $sep = !empty($parts['query']) ? '&' : '?';
-            }
-            $url .= $sep . http_build_query($this->parameters);
-        }
-
-        $this->addHttpHeaders(array('Location' =>  $url));
+        $this->redirectUrl = $url;
 
         if (!$this->isRedirection()) {
             throw new \InvalidArgumentException(sprintf('The HTTP status code is not a redirect ("%s" given).', $statusCode));
@@ -400,5 +434,42 @@ class Response implements ResponseInterface
     private function beautifyCallback($match)
     {
         return '-'.strtoupper($match[1]);
+    }
+
+    /**
+     * Build the absolute URI based on supplied URI and parameters.
+     *
+     * @param $uri    An absolute URI.
+     * @param $params Parameters to be append as GET.
+     *
+     * @return
+     * An absolute URI with supplied parameters.
+     *
+     * @ingroup oauth2_section_4
+     */
+    private function buildUri($uri, $params)
+    {
+        $parse_url = parse_url($uri);
+
+        // Add our params to the parsed uri
+        foreach ($params as $k => $v) {
+            if (isset($parse_url[$k])) {
+                $parse_url[$k] .= "&" . http_build_query($v, '', '&');
+            } else {
+                $parse_url[$k] = http_build_query($v, '', '&');
+            }
+        }
+
+        // Put humpty dumpty back together
+        return
+            ((isset($parse_url["scheme"])) ? $parse_url["scheme"] . "://" : "")
+            . ((isset($parse_url["user"])) ? $parse_url["user"]
+            . ((isset($parse_url["pass"])) ? ":" . $parse_url["pass"] : "") . "@" : "")
+            . ((isset($parse_url["host"])) ? $parse_url["host"] : "")
+            . ((isset($parse_url["port"])) ? ":" . $parse_url["port"] : "")
+            . ((isset($parse_url["path"])) ? $parse_url["path"] : "")
+            . ((isset($parse_url["query"]) && !empty($parse_url['query'])) ? "?" . $parse_url["query"] : "")
+            . ((isset($parse_url["fragment"])) ? "#" . $parse_url["fragment"] : "")
+        ;
     }
 }

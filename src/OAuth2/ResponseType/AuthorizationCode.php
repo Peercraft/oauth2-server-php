@@ -24,18 +24,27 @@ class AuthorizationCode implements AuthorizationCodeInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        // build the URL to redirect to
-        $result = array('query' => array());
+        $uri_params = array();
 
         $code = $this->generateAuthorizationCode();
         $this->saveAuthorizationCode($code, $params, $userInfo);
-        $result['query']['code'] = $code;
+        $uri_params['code'] = $code;
 
         if (isset($params['state'])) {
-            $result['query']['state'] = $params['state'];
+            $uri_params['state'] = $params['state'];
         }
 
-        return array($params['redirect_uri'], $result);
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array();
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'query';
     }
 
     /**

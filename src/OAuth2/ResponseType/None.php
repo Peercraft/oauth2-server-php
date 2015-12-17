@@ -10,6 +10,22 @@ class None implements NoneInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        return array($params['redirect_uri'], array());
+        $uri_params = array();
+
+        if (isset($params['state'])) {
+            $uri_params["state"] = $params['state'];
+        }
+
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array();
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'query';
     }
 }

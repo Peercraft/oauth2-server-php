@@ -20,9 +20,6 @@ class CodeIdTokenToken implements CodeIdTokenTokenInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        // build the URL to redirect to
-        $result = array('query' => array());
-
         $params += array('scope' => null, 'state' => null);
 
         /*
@@ -33,21 +30,31 @@ class CodeIdTokenToken implements CodeIdTokenTokenInterface
         $includeRefreshToken = false;
 
         $access_token = $this->accessToken->generateAccessToken();
-        $result["fragment"] = $this->accessToken->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
+        $uri_params = $this->accessToken->saveAccessToken($access_token, $params['client_id'], $userInfo, $params['scope'], $includeRefreshToken);
 
         $code = $this->authCode->generateAuthorizationCode();
         $this->authCode->saveAuthorizationCode($code, $params, $userInfo);
-        $result["fragment"]["code"] = $code;
+        $uri_params["code"] = $code;
 
         $params['authorization_code'] = $code;
         $params['access_token'] = $access_token;
         $id_token = $this->idToken->createIdToken($params, $userInfo);
-        $result["fragment"]["id_token"] = $id_token;
+        $uri_params["id_token"] = $id_token;
 
         if (isset($params['state'])) {
-            $result["fragment"]["state"] = $params['state'];
+            $uri_params["state"] = $params['state'];
         }
 
-        return array($params['redirect_uri'], $result);
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array('query');
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'fragment';
     }
 }

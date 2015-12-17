@@ -21,6 +21,7 @@ class AuthorizeController implements AuthorizeControllerInterface
     private $client_id;
     private $redirect_uri;
     private $response_type;
+    private $response_mode;
 
     protected $clientStorage;
     protected $publicKeyStorage;
@@ -83,16 +84,9 @@ class AuthorizeController implements AuthorizeControllerInterface
             return;
         }
 
-        // If no redirect_uri is passed in the request, use client's registered one
-        if (empty($this->redirect_uri)) {
-            $clientData              = $this->clientStorage->getClientDetails($this->client_id);
-            $registered_redirect_uri = $clientData['redirect_uri'];
-        }
-
         // the user declined access to the client's application
         if ($is_authorized === false) {
-            $redirect_uri = $this->redirect_uri ?: $registered_redirect_uri;
-            $this->setNotAuthorizedResponse($request, $response, $redirect_uri, $user_id);
+            $this->setNotAuthorizedResponse($request, $response, $this->redirect_uri, $user_id);
 
             return;
         }
@@ -102,18 +96,12 @@ class AuthorizeController implements AuthorizeControllerInterface
             return;
         }
 
-        $authResult = $this->responseTypes[$this->response_type]->getAuthorizeResponse($params, $user_id);
+        $uri_params = $this->responseTypes[$this->response_type]->getAuthorizeResponse($params, $user_id);
 
-        list($redirect_uri, $uri_params) = $authResult;
-
-        if (empty($redirect_uri) && !empty($registered_redirect_uri)) {
-            $redirect_uri = $registered_redirect_uri;
-        }
-
-        $uri = $this->buildUri($redirect_uri, $uri_params);
+        $response->addParameters($uri_params);
 
         // return redirect response
-        $response->setRedirect($this->config['redirect_status_code'], $uri);
+        $response->setRedirect($this->config['redirect_status_code'], $this->redirect_uri);
     }
 
     protected function setNotAuthorizedResponse(RequestInterface $request, ResponseInterface $response, $redirect_uri, $user_id = null)
@@ -136,6 +124,7 @@ class AuthorizeController implements AuthorizeControllerInterface
             'client_id'     => $this->client_id,
             'redirect_uri'  => $this->redirect_uri,
             'response_type' => $this->response_type,
+            'response_mode' => $this->response_mode,
         );
 
         return $params;
@@ -196,7 +185,10 @@ class AuthorizeController implements AuthorizeControllerInterface
             $redirect_uri = $registered_redirect_uris[0];
         }
 
-        // Select the redirect URI
+        $state = $request->query('state', $request->request('state'));
+
+        $response_mode = $request->query('response_mode', $request->request('response_mode'));
+
         $response_type = $request->query('response_type', $request->request('response_type'));
 
         // for multiple-valued response types - make them alphabetical
@@ -206,14 +198,16 @@ class AuthorizeController implements AuthorizeControllerInterface
             $response_type = ltrim(implode(' ', $types));
         }
 
-        // if response_type=token send error as fragment
-        if (in_array($response_type, array('token'))) {
-            $response->setErrorAsFragment(true);
+        if ($response_mode && !in_array($response_mode, array('fragment','query','form_post'))) {
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Response mode "'.$response_mode.'" not supported', null);
+
+            return false;
         }
 
-        $state = $request->query('state', $request->request('state'));
+        if ($response_mode) {
+            $response->setResponseMode($response_mode);
+        }
 
-        // type and client_id are required
         if (!$response_type) {
             $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Missing response type', null);
 
@@ -221,7 +215,19 @@ class AuthorizeController implements AuthorizeControllerInterface
         }
 
         if (!array_key_exists($response_type, $this->responseTypes)) {
-            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', $response_type . ' response type not supported', null);
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'unsupported_response_type', 'Response type "'.$response_type.'" not supported', null);
+
+            return false;
+        }
+
+        if (!$response_mode) {
+            $response_mode = $this->responseTypes[$response_type]->getDefaultResponseMode();
+            $response->setResponseMode($response_mode);
+        }
+
+        $disallowed_response_modes = $this->responseTypes[$response_type]->getDisallowedResponseModes();
+        if (in_array($response_mode, $disallowed_response_modes)) {
+            $response->setRedirect($this->config['redirect_status_code'], $redirect_uri, $state, 'invalid_request', 'Response mode "'.$response_mode.'" not allowed for response type "'.$response_type.'"', null);
 
             return false;
         }
@@ -287,45 +293,9 @@ class AuthorizeController implements AuthorizeControllerInterface
         // Only save the SUPPLIED redirect URI (@see http://tools.ietf.org/html/rfc6749#section-4.1.3)
         $this->redirect_uri  = $supplied_redirect_uri;
         $this->response_type = $response_type;
+        $this->response_mode = $response_mode;
 
         return true;
-    }
-
-    /**
-     * Build the absolute URI based on supplied URI and parameters.
-     *
-     * @param $uri    An absolute URI.
-     * @param $params Parameters to be append as GET.
-     *
-     * @return
-     * An absolute URI with supplied parameters.
-     *
-     * @ingroup oauth2_section_4
-     */
-    private function buildUri($uri, $params)
-    {
-        $parse_url = parse_url($uri);
-
-        // Add our params to the parsed uri
-        foreach ($params as $k => $v) {
-            if (isset($parse_url[$k])) {
-                $parse_url[$k] .= "&" . http_build_query($v, '', '&');
-            } else {
-                $parse_url[$k] = http_build_query($v, '', '&');
-            }
-        }
-
-        // Put humpty dumpty back together
-        return
-            ((isset($parse_url["scheme"])) ? $parse_url["scheme"] . "://" : "")
-            . ((isset($parse_url["user"])) ? $parse_url["user"]
-            . ((isset($parse_url["pass"])) ? ":" . $parse_url["pass"] : "") . "@" : "")
-            . ((isset($parse_url["host"])) ? $parse_url["host"] : "")
-            . ((isset($parse_url["port"])) ? ":" . $parse_url["port"] : "")
-            . ((isset($parse_url["path"])) ? $parse_url["path"] : "")
-            . ((isset($parse_url["query"]) && !empty($parse_url['query'])) ? "?" . $parse_url["query"] : "")
-            . ((isset($parse_url["fragment"])) ? "#" . $parse_url["fragment"] : "")
-        ;
     }
 
     /**
@@ -387,5 +357,10 @@ class AuthorizeController implements AuthorizeControllerInterface
     public function getResponseType()
     {
         return $this->response_type;
+    }
+
+    public function getResponseMode()
+    {
+        return $this->response_mode;
     }
 }

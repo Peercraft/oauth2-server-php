@@ -34,17 +34,26 @@ class IdToken implements IdTokenInterface
 
     public function getAuthorizeResponse($params, $userInfo = null)
     {
-        // build the URL to redirect to
-        $result = array('query' => array(), 'fragment' => array());
+        $uri_params = array();
 
         $id_token = $this->createIdToken($params, $userInfo);
-        $result["fragment"]["id_token"] = $id_token;
+        $uri_params["id_token"] = $id_token;
 
         if (isset($params['state'])) {
-            $result["fragment"]["state"] = $params['state'];
+            $uri_params["state"] = $params['state'];
         }
 
-        return array($params['redirect_uri'], $result);
+        return $uri_params;
+    }
+
+    public function getDisallowedResponseModes()
+    {
+        return array('query');
+    }
+
+    public function getDefaultResponseMode()
+    {
+        return 'fragment';
     }
 
     public function createIdToken($params, $userInfo = null)

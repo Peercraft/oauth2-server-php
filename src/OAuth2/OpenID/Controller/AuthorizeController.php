@@ -93,11 +93,6 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             return false;
         }
 
-        // if response_type is not code send error as fragment
-        if ($this->getResponseType() !== 'code') {
-            $response->setErrorAsFragment(true);
-        }
-
         // Check if requested reponsetype asks for id_token without openid scope
         if (in_array($this->getResponseType(), array('id_token', 'id_token token', 'code id_token', 'code id_token token')) && !$this->scopeUtil->checkScope('openid', $this->getScope())) {
             $response->setRedirect($this->config['redirect_status_code'], $this->getRedirectUri(), $this->getState(), 'invalid_scope', 'Responsetypes containing id_token requires openid scope');
