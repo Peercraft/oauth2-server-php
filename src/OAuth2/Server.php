@@ -22,6 +22,7 @@ use OAuth2\ResponseType\ResponseTypeInterface;
 use OAuth2\ResponseType\AuthorizationCode as AuthorizationCodeResponseType;
 use OAuth2\ResponseType\AccessToken;
 use OAuth2\ResponseType\JwtAccessToken;
+use OAuth2\ResponseType\None;
 use OAuth2\OpenID\ResponseType\CodeIdToken;
 use OAuth2\OpenID\ResponseType\CodeIdTokenToken;
 use OAuth2\OpenID\ResponseType\CodeToken;
@@ -96,6 +97,7 @@ class Server implements ResourceControllerInterface,
         'code id_token' => 'OAuth2\OpenID\ResponseType\CodeIdTokenInterface',
         'code id_token token' => 'OAuth2\OpenID\ResponseType\CodeIdTokenTokenInterface',
         'code token' => 'OAuth2\OpenID\ResponseType\CodeTokenInterface',
+        'none' => 'OAuth2\ResponseType\NoneInterface',
     );
 
     /**
@@ -667,6 +669,8 @@ class Server implements ResourceControllerInterface,
     {
         $responseTypes = array();
 
+        $responseTypes['none'] = new None();
+
         if ($this->config['allow_implicit']) {
             $responseTypes['token'] = $this->getAccessTokenResponseType();
             if ($this->config['use_openid_connect']) {
@@ -687,7 +691,7 @@ class Server implements ResourceControllerInterface,
             }
         }
 
-        if (count($responseTypes) == 0) {
+        if (count($responseTypes) <= 1) {
             throw new \LogicException("You must supply an array of response_types in the constructor or implement a OAuth2\Storage\AuthorizationCodeInterface storage object or set 'allow_implicit' to true and implement a OAuth2\Storage\AccessTokenInterface storage object");
         }
 
