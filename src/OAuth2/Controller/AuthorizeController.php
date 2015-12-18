@@ -84,9 +84,15 @@ class AuthorizeController implements AuthorizeControllerInterface
             return;
         }
 
+        $redirect_uri = $this->redirect_uri;
+        if (empty($redirect_uri)) {
+            $clientData = $this->clientStorage->getClientDetails($this->client_id);
+            $redirect_uri = $clientData['redirect_uris'][0];
+        }
+
         // the user declined access to the client's application
         if ($is_authorized === false) {
-            $this->setNotAuthorizedResponse($request, $response, $this->redirect_uri, $user_id);
+            $this->setNotAuthorizedResponse($request, $response, $redirect_uri, $user_id);
 
             return;
         }
@@ -101,7 +107,7 @@ class AuthorizeController implements AuthorizeControllerInterface
         $response->addParameters($uri_params);
 
         // return redirect response
-        $response->setRedirect($this->config['redirect_status_code'], $this->redirect_uri);
+        $response->setRedirect($this->config['redirect_status_code'], $redirect_uri);
     }
 
     protected function setNotAuthorizedResponse(RequestInterface $request, ResponseInterface $response, $redirect_uri, $user_id = null)
