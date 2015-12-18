@@ -84,6 +84,43 @@ class AuthorizeController extends BaseAuthorizeController implements AuthorizeCo
             $build_params['only_id_token_claims'] = array();
         }
 
+        if ($build_params['response_type'] === 'id_token') {
+            $scopes = isset( $request_params[ 'scope' ] ) ? explode( " ", $request_params[ 'scope' ] ) : array();
+            if( in_array( 'profile', $scopes ) )
+            {
+                $build_params['only_id_token_claims'][] = 'name';
+                $build_params['only_id_token_claims'][] = 'family_name';
+                $build_params['only_id_token_claims'][] = 'given_name';
+                $build_params['only_id_token_claims'][] = 'middle_name';
+                $build_params['only_id_token_claims'][] = 'nickname';
+                $build_params['only_id_token_claims'][] = 'preferred_username';
+                $build_params['only_id_token_claims'][] = 'profile';
+                $build_params['only_id_token_claims'][] = 'picture';
+                $build_params['only_id_token_claims'][] = 'website';
+                $build_params['only_id_token_claims'][] = 'gender';
+                $build_params['only_id_token_claims'][] = 'birthdate';
+                $build_params['only_id_token_claims'][] = 'zoneinfo';
+                $build_params['only_id_token_claims'][] = 'locale';
+                $build_params['only_id_token_claims'][] = 'updated_at';
+            }
+            if( in_array( 'email', $scopes ) )
+            {
+                $build_params['only_id_token_claims'][] = 'email';
+                $build_params['only_id_token_claims'][] = 'email_verified';
+            }
+            if( in_array( 'phone', $scopes ) )
+            {
+                $build_params['only_id_token_claims'][] = 'phone_number';
+                $build_params['only_id_token_claims'][] = 'phone_number_verified';
+            }
+            if( in_array( 'address', $scopes ) )
+            {
+                $build_params['only_id_token_claims'][] = 'address';
+            }
+
+            $build_params['only_id_token_claims'] = array_unique($build_params['only_id_token_claims']);
+        }
+
         return $build_params;
     }
 
